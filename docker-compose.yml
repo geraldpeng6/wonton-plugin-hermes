@@ -103,7 +103,7 @@ configs:
 x-wonton:
   spec: "0.4"
   id: com.nousresearch.hermes
-  version: 0.5.3
+  version: 0.5.4
   kind: agent
   title: { zh: Hermes, en: Hermes }
   description:
@@ -125,8 +125,8 @@ x-wonton:
 
       Messages travel in an encrypted Matrix chat, and model requests only go to the model gateway, so connect a model in Model settings first. It sends a confirmation card before changing data or installing plugins, and you decide.
   release_notes:
-    zh: 带上帮助 skill，Agent 照公开文档回答 App 和云吞的用法。想要新页面或应用时，先看写插件的指引。
-    en: Ships a help skill so the agent answers how to use the app and Wonton from the public docs. When you want a new page or app, it reads the plugin-writing guide first.
+    zh: 初始配置显式关闭会话自动清理，不再在主人配对前询问是否启用；不覆盖已有配置，不恢复历史消息密钥。
+    en: Explicitly disables automatic session pruning in the initial configuration, avoiding the pre-pairing opt-in prompt. Existing configuration and historical message keys are unchanged.
   agent:
     protocol: matrix
   bot:
