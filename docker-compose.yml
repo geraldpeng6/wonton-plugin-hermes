@@ -125,8 +125,8 @@ x-wonton:
 
       Messages travel in an encrypted Matrix chat, and model requests only go to the model gateway, so connect a model in Model settings first. It sends a confirmation card before changing data or installing plugins, and you decide.
   release_notes:
-    zh: 带上帮助 skill，Agent 照公开文档回答 App 和云吞的用法。
-    en: Ships a help skill so the agent answers how to use the app and Wonton from the public docs.
+    zh: 带上帮助 skill，Agent 照公开文档回答 App 和云吞的用法。想要新页面或应用时，先看写插件的指引。
+    en: Ships a help skill so the agent answers how to use the app and Wonton from the public docs. When you want a new page or app, it reads the plugin-writing guide first.
   agent:
     protocol: matrix
   bot:
