@@ -119,11 +119,11 @@ x-wonton:
     zh: |
       Nous Research 的 Hermes Agent：在 App 里和它私聊，它能联网搜索、用你装的插件提供的工具、读你授权的文件夹。
 
-      消息走加密的 Matrix 私聊，模型请求只发给模型网关，要先在“模型设置”里接好模型。经云吞装卸插件等敏感操作会发确认卡片；Hermes 自带的终端、文件、代码和浏览器工具不经云吞确认，可读写含密钥的 Bot 数据并访问外网和局域网，但没有挂载你的共享文件夹、宿主其他目录或其他插件的数据。
+      经云吞装卸插件这类操作要你在卡片上确认；Hermes 自带的终端、文件和浏览器工具在它自己的容器里直接运行，能读写这个 Bot 的数据（含密钥）、能联网，碰不到你的共享文件夹和别的插件的数据。
     en: |
       Hermes Agent by Nous Research: chat with it in the app. It can search the web, use the tools your plugins provide and read the folders you allow.
 
-      Messages travel in an encrypted Matrix chat, and model requests only go to the model gateway, so connect a model in Model settings first. Sensitive actions through Wonton, such as installing or uninstalling plugins, require a confirmation card; Hermes's own terminal, file, code and browser tools bypass Wonton confirmation, can read and write Bot data containing secrets and access the internet and LAN, but have no mounts for your shared folders, other host directories or other plugins' data.
+      Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and reach the network, but not your shared folders or other plugins' data.
   release_notes:
     zh: 初始配置显式关闭会话自动清理，不再在主人配对前询问是否启用；不覆盖已有配置，不恢复历史消息密钥。
     en: Explicitly disables automatic session pruning in the initial configuration, avoiding the pre-pairing opt-in prompt. Existing configuration and historical message keys are unchanged.

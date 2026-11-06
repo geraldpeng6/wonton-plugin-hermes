@@ -8,32 +8,12 @@
 
 ## 工具与确认的边界
 
-经云吞调用的工具受核心授权和确认规则约束：装卸插件等敏感操作要你在「Wonton」私聊的卡片上确认；读共享文件夹要先给提供文件工具的插件授权，已授权的只读调用不逐次弹卡片。
-Hermes 自带的终端、文件读写、代码执行和浏览器工具在自己的容器里运行，不经过云吞的确认卡片；Hermes 自己的审批另算。
+经云吞装卸插件等敏感操作要你在卡片上确认，读共享文件夹须先授权；Hermes 自带的终端、文件、代码和浏览器工具在自己的容器里直接跑，不经云吞确认。
+它们能读写这个 Bot 的数据目录（含密钥），能联网、能连局域网；没有挂载你的共享文件夹、宿主的其他目录和别的插件的数据。
+聊天或网页里的恶意指令可能诱导它把数据发出去或删掉。
 
-容器可读写这个 Bot 的 `/opt/data` 和插件的 `/opt/data/outbox`：包括配置、会话和记忆，也包括 `.env`、Matrix 加密存储、`platforms/matrix/recovery-key.txt`，以及进程环境里的 Bot 令牌和模型网关凭据。
-没有挂载你的共享文件夹、宿主的其他目录或 Docker socket，也没有直接挂载其他插件的数据；要读共享文件夹仍须经获授权的云吞文件工具。
-但 `network.egress` 同时允许访问外网和局域网：不能把“没挂载宿主文件”理解成“连不到宿主服务”。其他插件的独立网络默认隔离，但它们开放在局域网的端口、以及主人代理放行的目标仍可能被访问。
-聊天或网页中的恶意指令可能诱导 Hermes 读取、改写或删除自己的数据，或把密钥和对话发出去；文件工具对 `.env` 的拒读不限制终端的读取能力。
-
-边界依据：[本插件的挂载和权限](docker-compose.yml)、[云吞网络规则](https://github.com/geraldpeng6/wonton-docs/blob/6016721f84fd4354c0c8e3d68e6048393ea82434/plugin-spec.md#网络)和 [Hermes 的文件保护说明](https://github.com/NousResearch/hermes-agent/blob/bf0203a794a07aac3ff764972ab9087baa4e4f4e/agent/file_safety.py#L368-L410)。
-
-### 打开 Hermes 自己的审批
-
-本插件不覆盖 Hermes v0.22.5 的默认 `approvals.mode: smart`：命中危险命令规则后，上游的辅助模型可自动批准低风险操作，也可能要求你确认或直接拒绝。
-想让命中规则的命令先问你，在和 Hermes 的 Matrix 私聊里发送 `!approvals manual`；回复 `!approve` 才继续，`!deny` 拒绝，默认 300 秒没答则拒绝。恢复默认发 `!approvals smart`。
-这是 Hermes 在自己的私聊里发的审批提示，不是云吞的确认卡片；普通 `id`、文件读取等并不因此每次都问，已放行的规则也继续有效。如果这个会话开过 YOLO，需先发 `!yolo` 并确认回复是关闭，否则 `manual` 不会拦。
-
-也可以手动编辑这个 Bot **数据目录里的** `/opt/data/config.yaml`，合并以下设置（不要重复添加 `approvals` 键）：
-
-```yaml
-approvals:
-  mode: manual
-```
-
-改回 `smart` 即恢复默认，设置即时生效，无需重启。仓库根目录的 `config.yaml` 只是首次启动的种子，改它不会覆盖已安装 Bot 的配置。
-清单的 `settings` 原生设置表单是[规范预留项](https://github.com/geraldpeng6/wonton-docs/blob/6016721f84fd4354c0c8e3d68e6048393ea82434/plugin-spec.md#字段)，因此这里用上游已有的聊天开关，不添加无效表单。
-审批不是防止数据外传的隔离措施；触发范围和默认值见 [Hermes 审批实现](https://github.com/NousResearch/hermes-agent/blob/bf0203a794a07aac3ff764972ab9087baa4e4f4e/tools/approval.py#L1151-L1194)、[默认配置](https://github.com/NousResearch/hermes-agent/blob/bf0203a794a07aac3ff764972ab9087baa4e4f4e/hermes_cli/config_defaults.py#L1670-L1717)和 [Matrix 提示实现](https://github.com/NousResearch/hermes-agent/blob/bf0203a794a07aac3ff764972ab9087baa4e4f4e/plugins/platforms/matrix/adapter.py#L1678-L1702)。
+私聊发 `!approvals manual` 让命中危险规则的命令先问你，`!approvals smart` 恢复默认。
+如果这个会话开过 YOLO，需先发 `!yolo` 并确认回复是关闭，否则 `manual` 不会拦。
 
 ## 图标来源与授权
 
