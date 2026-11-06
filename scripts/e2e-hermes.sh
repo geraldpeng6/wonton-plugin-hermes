@@ -175,7 +175,7 @@ hermes_matrix_reply() {
   # /version is a real native gateway command: encryption/restart can be checked without
   # a model provider. Do not count an encrypted error message as a successful model turn.
   if [[ "$text" == /version ]]; then
-    grep -qF '0.22.5' "$out"
+    grep -qF '0.22.7' "$out"
   else
     grep -qF "$HERMES_MODEL_MARKER" "$out"
   fi
