@@ -6,7 +6,7 @@
 # 不同人的 Bot 不能共用一个容器。
 name: hermes
 
-x-image: &image nousresearch/hermes-agent:v0.22.5@sha256:9c5561579f3ffdf333401797094ac3a743738d6c25d40f4331c7bf77b694238d
+x-image: &image nousresearch/hermes-agent:v0.22.7@sha256:e6d81ae52ebf6a43efa529701405509f20054ba818f179ddd748bed4f8af584c
 
 services:
   # 每次创建容器时（安装、升级、重建）把 Wonton 的 Hermes 插件（wonton/）放进这个 Bot 的数据目录，覆盖旧版本；包里的
@@ -46,34 +46,12 @@ services:
     network_mode: none
     restart: "no"
 
-  # v0.22.5 的 dashboard 重启命令使用独立解释器；首次使用前须由官方 PM 登记镜像自带的依赖集。
-  runtime:
-    image: *image
-    user: "${PUID}:${PGID}"
-    entrypoint: [/opt/hermes/.venv/bin/python, -c]
-    command:
-      - |
-        import subprocess
-        from pathlib import Path
-        from pm.environments import committed_venv, site_packages
-        environment = committed_venv(Path("/opt/hermes"))
-        if environment is None or not site_packages(environment).is_dir():
-            subprocess.run(["/opt/hermes/.venv/bin/hermes", "pm", "repair"], check=True)
-    environment:
-      HOME: /opt/data
-    volumes:
-      - ${WONTON_BOT_DATA}:/opt/data
-    depends_on:
-      init:
-        condition: service_completed_successfully
-    restart: "no"
-
   gateway:
     image: *image
     restart: unless-stopped
     command: ["gateway", "run"]
     depends_on:
-      runtime:
+      init:
         condition: service_completed_successfully
     environment:
       # 镜像启动时把内部用户改成这个 uid/gid，再修正数据目录属主。
@@ -185,21 +163,21 @@ x-wonton:
 
       Open the plugin page to configure Telegram, Feishu or WeCom for the default bot in Hermes' native Channels page. Telegram uses Wonton's outbound proxy.
   release_notes:
-    zh: 增加默认 Bot 的原生 Channels 网页和 Telegram 出网代理，插件网页只经核心网关打开。需要插件规范 0.7。
-    en: Adds the default bot's native Channels page and a Telegram outbound proxy; the plugin page opens only through the core gateway. Requires spec 0.7.
+    zh: 增加默认 Bot 的原生 Channels 网页和 Telegram 出网代理，插件网页只经核心网关打开；升级官方 Hermes 至 0.22.7，修复原生重启的依赖清单识别，不额外安装运行依赖。需要插件规范 0.7。
+    en: Adds the default bot's native Channels page and a Telegram outbound proxy, opening the page only through the core gateway. Upgrades official Hermes to 0.22.7 to fix native restart payload discovery without installing extra runtime dependencies. Requires spec 0.7.
   agent:
     protocol: matrix
   bot:
     display_name: { zh: Hermes, en: Hermes }
   # 原生回环 dashboard 不另建账号；主人会话由核心网关校验，不开放局域网端口。
   webui:
-    service: web
+    service: gateway
     port: 8080
     path: /channels
     sso: none
-  # web 与 gateway 同组，网页入口只路由到 default Bot；每个 Bot 的数据和凭据保持隔离。
+  # nginx 在 gateway 的命名空间监听 8080；入口指向 default Bot 的网络目标服务。
   bots:
-    services: [init, runtime, gateway, web]
+    services: [init, gateway, web]
   secrets:
     # Hermes 只凭令牌就自动建好交叉签名，恢复密钥只写在数据目录里；交给核心保管，数据丢了还能恢复。
     matrix_recovery_key:

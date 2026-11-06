@@ -176,7 +176,7 @@ hermes_matrix_reply() {
   # /version is a real native gateway command: encryption/restart can be checked without
   # a model provider. Do not count an encrypted error message as a successful model turn.
   if [[ "$text" == /version ]]; then
-    grep -qF '0.22.5' "$out"
+    grep -qF '0.22.7' "$out"
   else
     grep -qF "$HERMES_MODEL_MARKER" "$out"
   fi
@@ -220,12 +220,11 @@ hermes_native_restart() {
 # 环境变量 E2E_MODEL_UPSTREAM_URL、E2E_MODEL_UPSTREAM_KEY、E2E_UPSTREAM_MODEL，这里不猜怎么取。
 # 容器带 Docker 客户端注入的代理变量，连上游要显式 no_proxy 直连。一次性凭据的建和删由调用方负责。
 hermes_configure_model_upstream() {
-  local magpie_ctr magpie_net probe_list upstream_host gw wait_i picked models_json want
+  local magpie_ctr probe_list upstream_host gw wait_i picked models_json want
   local upstream_url="${E2E_MODEL_UPSTREAM_URL:?}"
   local key="${E2E_MODEL_UPSTREAM_KEY:?}"
   want="${E2E_UPSTREAM_MODEL:?}"
   magpie_ctr="wonton-$E2E_INSTANCE--ai-usemagpie-magpie--magpie"
-  magpie_net="wonton-$E2E_INSTANCE--ai-usemagpie-magpie"
   docker inspect "$magpie_ctr" >/dev/null 2>&1 || { fail 模型能回话 "smoke 实例没有 magpie 容器"; return 1; }
   upstream_host="$(sed -E 's#^https?://([^/:]+).*#\1#' <<<"$upstream_url")"
   probe_list="localhost,127.0.0.1,host.docker.internal,$upstream_host"
@@ -243,10 +242,13 @@ hermes_configure_model_upstream() {
     fail 模型能回话 "实例模型网关配置上游失败"
     return 1
   fi
-  # 这版 magpie 的 add 不保证把模型暴露出来，按它自己的提示显式暴露一次。
-  docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
-    magpie provider models upstream "+$picked" >>"$LOG" 2>&1 ||
-    { fail 模型能回话 "实例模型网关暴露上游模型失败"; return 1; }
+  # 这版 magpie 的 add 不保证把模型暴露出来，按它自己的提示显式暴露；有些上游 id 只是路由名，
+  # `+` 认不出它，网关自己的 auto 路由作为兜底（不存在时这条失败无妨）。
+  local model_id
+  for model_id in "$picked" auto/glm-5.3-flash; do
+    docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+      magpie provider models upstream "+$model_id" >>"$LOG" 2>&1 || true
+  done
   # provider 变化后默认路由组重建，核心可能重建这个 Bot 的容器来注入新 env：每轮重新取容器和变量，
   # 等到路由组在网关模型列表里出现（`group/…` 不会作为 id 返回，判据是列表非空）。
   for wait_i in $(seq 1 90); do

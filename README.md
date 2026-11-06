@@ -26,11 +26,11 @@
 
 ## Dashboard 接入约束
 
-需要支持插件规范 `0.7`、`network_mode: service:<服务>` 和默认 Bot 网页入口的核心。官方 Hermes 镜像的 s6 在同一个容器管理 gateway 和回环 dashboard；官方 nginx 与它共用网络命名空间，转发时改写 Host、Origin，并保留 WebSocket。网页只经核心网关，`sso: none`，不发布局域网端口。nginx 使用 BSD-2-Clause，许可见 [NOTICE](NOTICE)。
+需要支持插件规范 `0.7`、`network_mode: service:<服务>` 和默认 Bot 网页入口的核心。官方 Hermes 镜像的 s6 在同一个容器管理 gateway 和回环 dashboard；官方 nginx 与它共用网络命名空间，转发时改写 Host、Origin，并保留 WebSocket。`webui.service` 指向网络目标 `gateway`，端口 `8080` 由同命名空间的 nginx 监听。网页只经核心网关，`sso: none`，不发布局域网端口。nginx 使用 BSD-2-Clause，许可见 [NOTICE](NOTICE)。
 
-Hermes v0.22.5 的 dashboard 把临时 token 注入 HTML，原生前端通过 `X-Hermes-Session-Token` 或 WebSocket 的 `token` 参数传回；裸请求返回 401 不等于核心登录失效。每次刷新由原生页面重新取得 token，不另建 Hermes 账号。
+Hermes 的回环 dashboard 把临时 token 注入 HTML，原生前端通过 `X-Hermes-Session-Token` 或 WebSocket 的 `token` 参数传回；裸请求返回 401 不等于核心登录失效。每次刷新由原生页面重新取得 token，不另建 Hermes 账号。
 
-v0.22.5 的官方镜像在全新数据目录上没有供 dashboard 子命令使用的已登记依赖环境。`runtime` 一次性服务在依赖环境缺失时运行官方 `hermes pm repair`，按上游锁文件恢复镜像自带的依赖集；不改源码或镜像，失败即阻止 gateway 启动。依赖放在 Bot 数据目录，安装需要额外磁盘空间和可用出网；重装保留数据时复用。
+使用官方 Hermes v0.22.7，包含 [上游 #145738](https://github.com/NousResearch/hermes-agent/pull/145738) 对镜像内 payload 清单路径的修复（[问题 #138990](https://github.com/NousResearch/hermes-agent/issues/138990)）。dashboard 的重启子命令直接使用镜像自带依赖，不在每个 Bot 的数据目录额外复制和安装一套运行依赖。
 
 Channels 保存凭据到该 Bot 的 `.env`；“Restart to apply” 调用 `hermes -p default gateway restart --interrupt`，由原生 s6 替换 gateway 进程，dashboard 和容器继续运行。当前对话可能被中断，Matrix 由 gateway 重连。按钮返回成功只代表已启动重启命令，验证还需核对 action 的退出码、gateway 新 PID 和渠道状态。
 

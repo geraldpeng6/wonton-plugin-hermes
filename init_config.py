@@ -1,7 +1,7 @@
 # 每次创建容器时把数据目录里的 config.yaml 修到和注入值一致（Hermes 自己也会改写它，这里只动核心管的两处）。
 #
-# 1) gateway.trust_env：配了代理时，Hermes 的 Matrix 适配器（v0.22.5 实测）读了 HTTPS_PROXY 就不看 NO_PROXY，
-#    连内部的 matrix.wonton.internal 也发给出口容器，被 403 拒绝，所以关掉网关读代理变量的开关。
+# 1) gateway.trust_env：Matrix 适配器 v0.22.5–v0.22.7 解析代理时不传目标主机，NO_PROXY 不生效；继承
+#    HTTPS_PROXY 会把内部的 matrix.wonton.internal 发给出口代理而被 403 拒绝，所以关闭网关的环境代理。
 # 2) providers.magpie：模型网关可选（spec：“models”是“有网关就用”）——三个模型变量都有值时保持启用（没有
 #    enabled 字段就是启用）；都是空字符串（没接上网关）时标成 disabled，模型设置里不再显示这个不可用的
 #    provider，模型要用户自己在设置里配；网关装好后核心重建容器，这里再把它启用回来。用户自己加的 provider
