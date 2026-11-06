@@ -103,7 +103,7 @@ configs:
 x-wonton:
   spec: "0.4"
   id: com.nousresearch.hermes
-  version: 0.5.4
+  version: 0.5.5
   kind: agent
   title: { zh: Hermes, en: Hermes }
   description:
@@ -125,8 +125,8 @@ x-wonton:
 
       Messages travel in an encrypted Matrix chat, and model requests only go to the model gateway, so connect a model in Model settings first. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and reach the network, but not your shared folders or other plugins' data.
   release_notes:
-    zh: 初始配置显式关闭会话自动清理，不再在主人配对前询问是否启用；不覆盖已有配置，不恢复历史消息密钥。
-    en: Explicitly disables automatic session pruning in the initial configuration, avoiding the pre-pairing opt-in prompt. Existing configuration and historical message keys are unchanged.
+    zh: 初始配置关闭会话自动清理，避免配对前询问，并说明 Hermes 容器内工具与云吞确认卡片的边界。
+    en: Disables automatic session pruning in the initial configuration to avoid pre-pairing prompts and clarifies the boundary between Hermes's container tools and Wonton confirmation cards.
   agent:
     protocol: matrix
   bot:
