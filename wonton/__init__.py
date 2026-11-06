@@ -11,6 +11,7 @@
 每轮带上发文件的办法：Hermes 把工具结果里的预览存成缓存文件，写上 MEDIA:<路径>，它的 Matrix 提示
 又教模型用 MEDIA: 发文件，没有这句话时模型很可能把预览发给主人。存文件的办法也在这里：outbox 的路径是 Hermes 的挂载决定的。
 同一轮还带一句引导语：主人想要新页面或应用时，先调 wonton__plugin_guide。
+工具错误和确认过程也要按结果回答：调用前的预告不是执行结果，返回速度和成功结果都不能证明没有经过确认卡片。
 """
 
 import logging
@@ -37,6 +38,13 @@ SEND_FILES = (
 )
 
 WRITE_PLUGIN = "主人想要一个新的页面、应用或小工具，或者要改你之前写的插件时：先调 wonton__plugin_guide，照它说的做。"
+
+TOOL_RESULTS = (
+    "只按实际工具结果汇报，没调用的工具不能说已查过或执行过。调用前只预告将请求操作，不能说已开始、已完成或确认卡片已发出。"
+    "Hermes 将工具失败标为顶层非空 error：遇到它，说明哪一步没成、结果给出的原因（用人话）和用户能做什么；不能继续说已开始或已完成。"
+    "结果不确定就说不确定。确认卡片由核心处理，返回快或返回成功都不能证明没经过确认；"
+    "结果没明确说明本次是否经过主人确认时，说不知道，不能编造没发卡片、绕过确认或主人已经点了允许。"
+)
 
 
 async def missing_model_hint(text="", **_):
@@ -84,7 +92,7 @@ def _gateway_provider_active() -> bool:
 
 def send_files_context(**_):
     """``pre_llm_call``：返回的文字追加在这一轮的用户消息后面，不进系统提示。"""
-    return {"context": f"{SEND_FILES}\n{WRITE_PLUGIN}"}
+    return {"context": f"{SEND_FILES}\n{WRITE_PLUGIN}\n{TOOL_RESULTS}"}
 
 
 def register(ctx):
