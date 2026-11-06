@@ -4,7 +4,7 @@
 权限。一个插件一个 Git 仓库，仓库根目录就是插件包，发布就是打 tag。主人在 App 里装上插件，核心按清单起容器、接好登录，
 插件的网页在 App 里作为小程序打开。
 
-这个仓库是 Hermes 插件：云吞的默认 Agent，以 Matrix bot 身份和主人对话，模型经模型网关。怎么写插件、怎么用开发环境，见下面的说明（从模板仓库带来）。
+这个仓库是 Hermes 插件：云吞的默认 Agent，以 Matrix bot 身份和主人对话，模型经模型网关。插件网页打开默认 Bot 的原生 Channels 页，由主人填写 Telegram、飞书、企业微信的凭据和白名单。怎么写插件、怎么用开发环境，见下面的说明（从模板仓库带来）。
 
 ## 工具与确认的边界
 
@@ -23,6 +23,20 @@
 ## 图标来源与授权
 
 `icon.png` 是 Nous Research 官方标志，来源、版权、处理方式、MIT 全文和商标说明见 [NOTICE](NOTICE)。本插件是独立维护的云吞插件包，不代表上游官方出品、合作或背书。
+
+## Dashboard 接入约束
+
+需要支持插件规范 `0.7`、`network_mode: service:<服务>` 和默认 Bot 网页入口的核心。官方 Hermes 镜像的 s6 在同一个容器管理 gateway 和回环 dashboard；官方 nginx 与它共用网络命名空间，转发时改写 Host、Origin，并保留 WebSocket。网页只经核心网关，`sso: none`，不发布局域网端口。nginx 使用 BSD-2-Clause，许可见 [NOTICE](NOTICE)。
+
+Hermes v0.22.5 的 dashboard 把临时 token 注入 HTML，原生前端通过 `X-Hermes-Session-Token` 或 WebSocket 的 `token` 参数传回；裸请求返回 401 不等于核心登录失效。每次刷新由原生页面重新取得 token，不另建 Hermes 账号。
+
+v0.22.5 的官方镜像在全新数据目录上没有供 dashboard 子命令使用的已登记依赖环境。`runtime` 一次性服务在依赖环境缺失时运行官方 `hermes pm repair`，按上游锁文件恢复镜像自带的依赖集；不改源码或镜像，失败即阻止 gateway 启动。依赖放在 Bot 数据目录，安装需要额外磁盘空间和可用出网；重装保留数据时复用。
+
+Channels 保存凭据到该 Bot 的 `.env`；“Restart to apply” 调用 `hermes -p default gateway restart --interrupt`，由原生 s6 替换 gateway 进程，dashboard 和容器继续运行。当前对话可能被中断，Matrix 由 gateway 重连。按钮返回成功只代表已启动重启命令，验证还需核对 action 的退出码、gateway 新 PID 和渠道状态。
+
+Telegram 显式使用核心注入的 `WONTON_PROXY_URL`；未配代理时为空，走直连。渠道凭据和白名单留在 Hermes 原生页面，不增加插件设置字段。没有真实 IM 凭据时只能验证错误反馈，不能据此声称真实渠道已连通。
+
+`scripts/e2e-hermes.sh` 是共享冒烟入口的 Hermes 专项实现：在共享 runner 的 `plugins/hermes.sh` 中 source 此文件，沿用 runner 的名额和清理机制。需要预先构建好的核心、隧道客户端、加密 Matrix 探针镜像；测试不会读取宿主凭据或替主人配置模型服务商。
 
 ## 准备
 
