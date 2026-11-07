@@ -1,6 +1,7 @@
 # Hermes：云吞的默认 Agent。核心镜像带着同一份，核心第一次启动时自动装上；这个仓库让主人卸掉以后还能从商店装回来。
 #
-# Hermes 用自带的 Matrix 平台以 bot 身份登录 Tuwunel，只收发消息；模型请求只发给模型网关（magpie）。
+# Hermes 用自带的 Matrix 平台以 bot 身份登录 Tuwunel，只收发消息；模型默认走模型网关（magpie），
+# 没接上网关时用主人在“模型设置”里自己配的服务商。
 # 每个 Bot 一组 init + gateway 容器（x-wonton.bots）：Hermes 的 profile 不隔离文件系统，
 # 不同人的 Bot 不能共用一个容器。
 name: hermes
@@ -21,7 +22,12 @@ services:
         cp /seed/wonton/plugin.yaml /seed/wonton/__init__.py /opt/data/plugins/wonton/ &&
         cp /seed/skills/wonton-help/SKILL.md /opt/data/skills/wonton-help/ &&
         { test -f /opt/data/config.yaml || cp /seed/config.yaml /opt/data/config.yaml; } &&
-        /opt/hermes/.venv/bin/python /seed/gateway_trust_env.py
+        /opt/hermes/.venv/bin/python /seed/init_config.py
+    environment:
+      # init 要按注入值修 config.yaml：网关的三个变量为空表示没接上，magpie 标成 disabled。
+      WONTON_MODEL_BASE_URL: ${WONTON_MODEL_BASE_URL}
+      WONTON_MODEL_API_KEY: ${WONTON_MODEL_API_KEY}
+      WONTON_MODEL_DEFAULT: ${WONTON_MODEL_DEFAULT}
     volumes:
       - ${WONTON_BOT_DATA}:/opt/data
     configs:
@@ -31,8 +37,8 @@ services:
         target: /seed/wonton/plugin.yaml
       - source: wonton_hooks
         target: /seed/wonton/__init__.py
-      - source: gateway_trust_env
-        target: /seed/gateway_trust_env.py
+      - source: init_config
+        target: /seed/init_config.py
       - source: wonton_help_skill
         target: /seed/skills/wonton-help/SKILL.md
     network_mode: none
@@ -95,20 +101,20 @@ configs:
     file: ./wonton/plugin.yaml
   wonton_hooks:
     file: ./wonton/__init__.py
-  gateway_trust_env:
-    file: ./gateway_trust_env.py
+  init_config:
+    file: ./init_config.py
   wonton_help_skill:
     file: ./skills/wonton-help/SKILL.md
 
 x-wonton:
   spec: "0.4"
   id: com.nousresearch.hermes
-  version: 0.5.5
+  version: 0.6.0
   kind: agent
   title: { zh: Hermes, en: Hermes }
   description:
-    zh: 默认 Agent：以 Matrix bot 身份和你对话，模型经 magpie
-    en: Default agent that chats as a Matrix bot and reaches models through magpie
+    zh: 默认 Agent：以 Matrix bot 身份和你对话，模型走模型网关或你自己的服务商
+    en: Default agent that chats as a Matrix bot, using the model gateway or your own provider
   icon: icon.png
   notices: [NOTICE]
   author: { name: geraldpeng6 }
@@ -119,14 +125,14 @@ x-wonton:
     zh: |
       Nous Research 的 Hermes Agent：在 App 里和它私聊，它能联网搜索、用你装的插件提供的工具、读你授权的文件夹。
 
-      消息走加密的 Matrix 私聊，模型请求只发给模型网关，要先在“模型设置”里接好模型。经云吞装卸插件这类操作要你在卡片上确认；Hermes 自带的终端、文件和浏览器工具在它自己的容器里直接运行，能读写这个 Bot 的数据（含密钥）、能联网，碰不到你的共享文件夹和别的插件的数据。
+      消息走加密的 Matrix 私聊。模型默认走模型网关，不用自己填 key；没接网关时在“模型设置”里加自己的模型服务商和 key 也能用，它会提醒你怎么配。经云吞装卸插件这类操作要你在卡片上确认；Hermes 自带的终端、文件和浏览器工具在它自己的容器里直接运行，能读写这个 Bot 的数据（含密钥）、能联网，碰不到你的共享文件夹和别的插件的数据。
     en: |
       Hermes Agent by Nous Research: chat with it in the app. It can search the web, use the tools your plugins provide and read the folders you allow.
 
-      Messages travel in an encrypted Matrix chat, and model requests only go to the model gateway, so connect a model in Model settings first. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and reach the network, but not your shared folders or other plugins' data.
+      Messages travel in an encrypted Matrix chat. The model goes through the model gateway by default, so there is no key to fill in; without a gateway, add your own provider and key in Model settings and it will guide you there. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and reach the network, but not your shared folders or other plugins' data.
   release_notes:
-    zh: 初始配置关闭会话自动清理，避免配对前询问，并说明 Hermes 容器内工具与云吞确认卡片的边界。
-    en: Disables automatic session pruning in the initial configuration to avoid pre-pairing prompts and clarifies the boundary between Hermes's container tools and Wonton confirmation cards.
+    zh: 模型网关改成可选：没接上网关也能装，Hermes 会指引在“模型设置”里配模型；网关装好后自动接上。没接上网关时直接告诉主人去配模型，不再把 Hermes 的原始报错发进聊天。
+    en: "The model gateway becomes optional: install without one and Hermes guides you to Model settings; it reconnects automatically once a gateway is installed. Without a gateway it explains what to do instead of surfacing Hermes's raw error."
   agent:
     protocol: matrix
   bot:
