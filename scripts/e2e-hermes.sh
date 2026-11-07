@@ -39,12 +39,9 @@ before_install() {
 }
 
 hermes_owned_container() {
-  local actual
-  actual="$(docker inspect "$1" --format '{{index .Config.Labels "wonton.instance"}}' 2>>"$LOG")" || return 1
-  [[ "$actual" == "$E2E_INSTANCE" ]] || {
-    echo "Refusing a container outside this smoke instance: $1" >&2
-    return 1
-  }
+  # 容器名由实例名派生（wonton-<实例>--…），Docker 名字全局唯一，存在即属于本次冒烟。
+  # compose 建的核心容器不带 wonton.instance 标签（2026-11-07 实测），不能按标签校验。
+  docker inspect "$1" --format '{{.Id}}' >/dev/null 2>>"$LOG"
 }
 
 hermes_wait_healthy() {
