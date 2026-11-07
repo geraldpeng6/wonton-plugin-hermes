@@ -224,20 +224,21 @@ hermes_native_restart() {
 # 网关凭据，agent_cleanup 里删掉；分流机只读 key 文件。
 hermes_configure_magpie_upstream() {
   local magpie_ctr magpie_net gw_ip code key probe_list gw wait_i picked key_name
-  local remote_base remote_host upstream_url
+  local remote_base remote_host upstream_url models_json want
   magpie_ctr="wonton-$E2E_INSTANCE--ai-usemagpie-magpie--magpie"
   magpie_net="wonton-$E2E_INSTANCE--ai-usemagpie-magpie"
   docker inspect "$magpie_ctr" >/dev/null 2>&1 || { fail 模型能回话 "smoke 实例没有 magpie 容器"; return 1; }
   if [[ -n ${E2E_ON_REMOTE:-} ]]; then
     [[ -f $E2E_REMOTE_MODEL_KEY ]] || { echo "分流机没有上游凭据文件"; return 1; }
-    picked="${E2E_UPSTREAM_MODEL:-remote-magpie/jc/glm-5.3-flash}"
+    want="${E2E_UPSTREAM_MODEL:-remote-magpie/jc/glm-5.3-flash}"
     remote_base="${E2E_REMOTE_MAGPIE_URL:-http://192.168.0.31:3425}"
     remote_host="$(sed -E 's#^https?://([^/:]+).*#\1#' <<<"$remote_base")"
     probe_list="localhost,127.0.0.1,$remote_host"
     upstream_url="$remote_base/v1"
     key="$(cat "$E2E_REMOTE_MODEL_KEY")"
   else
-    picked="${E2E_UPSTREAM_MODEL:?需要明确设置验收用的上游模型}"
+    # 本机上游是宿主 magpie 自己的路由（auto/…）；场主按 Mac 上的裸 id 设了值时按后缀找。
+    want="${E2E_UPSTREAM_MODEL:-auto/glm-5.3-flash}"
     gw_ip="$(docker network inspect "$magpie_net" --format '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null)" || { fail 模型能回话 "拿不到 magpie 网络网关"; return 1; }
     probe_list="host.docker.internal,$gw_ip,localhost,127.0.0.1"
     upstream_url="http://$gw_ip:3425/v1"
@@ -258,19 +259,27 @@ hermes_configure_magpie_upstream() {
       export E2E_HOST_MODEL_KEY_ID
     fi
   fi
-  if ! docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
-      curl --fail --silent --show-error --noproxy '*' --max-time 10 \
-      -H "Authorization: Bearer $key" "$upstream_url/models" 2>>"$LOG" \
-      | jq -e --arg model "$picked" 'any(.data[]; .id == $model)' >/dev/null; then
-    fail 模型能回话 "指定上游模型不存在或模型列表请求失败"
-    return 1
+  models_json="$(docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+    curl --fail --silent --show-error --noproxy '*' --max-time 10 \
+    -H "Authorization: Bearer $key" "$upstream_url/models" 2>>"$LOG")" ||
+    { fail 模型能回话 "上游模型列表请求失败"; return 1; }
+  # 精确 id；否则按后缀（宿主 magpie 的 id 带自己的 provider 前缀）；本机再退回 auto 路由。
+  picked="$(jq -r --arg want "$want" \
+    '[.data[].id] | (map(select(. == $want))[0] // map(select(endswith("/" + $want)))[0] // empty)' <<<"$models_json")"
+  if [[ -z $picked && -z ${E2E_ON_REMOTE:-} ]]; then
+    picked="$(jq -r '[.data[].id] | map(select(. == "auto/glm-5.3-flash"))[0] // empty' <<<"$models_json")"
   fi
+  [[ -n $picked ]] || { fail 模型能回话 "上游模型列表里没有 $want"; return 1; }
   say "上游模型：$picked"
   if ! docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
       magpie provider add upstream "url=$upstream_url" "key=$key" "models=$picked" >>"$LOG" 2>&1; then
     fail 模型能回话 "实例模型网关配置上游失败"
     return 1
   fi
+  # 这版 magpie 的 add 不保证把模型暴露出来，按它自己的提示显式暴露一次。
+  docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+    magpie provider models upstream "+$picked" >>"$LOG" 2>&1 ||
+    { fail 模型能回话 "实例模型网关暴露上游模型失败"; return 1; }
   # provider 变化后默认路由组重建，核心可能重建这个 Bot 的容器来注入新 env：每轮重新取容器和变量，
   # 等到路由组在网关模型列表里出现（`group/…` 不会作为 id 返回，判据是列表非空）。
   for wait_i in $(seq 1 90); do
