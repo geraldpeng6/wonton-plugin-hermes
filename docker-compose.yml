@@ -12,6 +12,7 @@ services:
   # 每次创建容器时（安装、升级、重建）把 Wonton 的 Hermes 插件（wonton/）放进这个 Bot 的数据目录，覆盖旧版本；包里的
   # config.yaml 只在首次启动前写入，已有配置时不覆盖（Hermes 自己也会改写它，比如 /model）。
   # 帮助 skill（skills/wonton-help/）同样每次都覆盖，内容从公开文档原样取来。
+  # 上游 v0.22.5 只在数据根目录属主不匹配时修复子目录；核心已设好根目录属主，所以 init 要交接它写的目录。
   init:
     image: *image
     entrypoint:
@@ -22,7 +23,8 @@ services:
         cp /seed/wonton/plugin.yaml /seed/wonton/__init__.py /opt/data/plugins/wonton/ &&
         cp /seed/skills/wonton-help/SKILL.md /opt/data/skills/wonton-help/ &&
         { test -f /opt/data/config.yaml || cp /seed/config.yaml /opt/data/config.yaml; } &&
-        /opt/hermes/.venv/bin/python /seed/init_config.py
+        /opt/hermes/.venv/bin/python /seed/init_config.py &&
+        chown -R ${PUID}:${PGID} /opt/data/skills /opt/data/plugins
     environment:
       # init 要按注入值修 config.yaml：网关的三个变量为空表示没接上，magpie 标成 disabled。
       WONTON_MODEL_BASE_URL: ${WONTON_MODEL_BASE_URL}
@@ -109,7 +111,7 @@ configs:
 x-wonton:
   spec: "0.4"
   id: com.nousresearch.hermes
-  version: 0.6.0
+  version: 0.6.1
   kind: agent
   title: { zh: Hermes, en: Hermes }
   description:
@@ -131,8 +133,8 @@ x-wonton:
 
       Messages travel in an encrypted Matrix chat. The model goes through the model gateway by default, so there is no key to fill in; without a gateway, add your own provider and key in Model settings and it will guide you there. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and reach the network, but not your shared folders or other plugins' data.
   release_notes:
-    zh: 模型网关改成可选：没接上网关也能装，Hermes 会指引在“模型设置”里配模型；网关装好后自动接上。没接上网关时直接告诉主人去配模型，不再把 Hermes 的原始报错发进聊天。
-    en: "The model gateway becomes optional: install without one and Hermes guides you to Model settings; it reconnects automatically once a gateway is installed. Without a gateway it explains what to do instead of surfacing Hermes's raw error."
+    zh: 初始化后将技能和插件目录交给网关用户，修复新建技能时的权限错误；保留已有技能和配置。
+    en: Assigns initialized skill and plugin directories to the gateway user, fixing skill creation permissions while preserving existing skills and configuration.
   agent:
     protocol: matrix
   bot:
