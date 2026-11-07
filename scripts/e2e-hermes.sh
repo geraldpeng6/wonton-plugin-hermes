@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 # Sourced by the shared e2e/smoke.sh through plugins/hermes.sh, not a standalone runner.
 # Keeps the harness's stack slot, installation, reporting and instance-only cleanup.
-# Requires the harness-provided core image (WONTON_CORE_IMAGE), tunnel-client, echo-bot and
-# curl images; no image builds, upstream rewrites, host credentials or model-provider provisioning.
-# Model settings must already expose a usable default route in this disposable instance.
-# Missing model prerequisites are UNTESTED, never PASS; an authentication rejection stops
-# the Agent checks without reading or changing any host credentials.
+# Requires a prebuilt spec-0.7 core (base #180), tunnel-client, echo-bot and curl images;
+# no image builds or upstream rewrites. The instance's magpie upstream is pointed at the
+# harness model gateway (same mechanism as the other Agent wrappers): on npchy through the
+# host magpie with an ephemeral gateway key, on a remote runner through the key file the
+# owner left for that machine. Missing prerequisites are UNTESTED, never PASS; an
+# authentication rejection stops the Agent checks without reading host configuration.
 # Logs/results may contain private runtime replies: keep the harness work directory private.
 #
-# 与 #9（feat/dashboard-webui）的同名脚本的差异：原生控制台步骤（页面注入令牌、/api/status、
-# /api/gateway/restart、Channels 端点）依赖 #9 的 dashboard，0.6.0 的清单没有 webui，全部去掉；
-# 网关重启改为 docker restart 后等 healthy（容器不变、进程重启，验证加密状态从数据目录重载）；
-# /version 的版本断言跟本仓库 compose 固定的上游镜像 v0.22.5。
+# 原生控制台步骤（页面注入令牌、/api/status、/api/gateway/restart、Channels 端点）依赖
+# 清单里的 webui 和规范 0.7 的默认 Bot 网页入口；网关重启走原生 dashboard，不经 docker restart。
+# /version 的版本断言跟本仓库 compose 固定的上游镜像。
 # Hook variables and lowercase port are supplied/consumed by the sourcing harness.
 # shellcheck disable=SC2034,SC2154
+SSO=none
 MCP=0
-E2E_NOTE="Paired owner tunnel; encrypted Matrix across gateway process restart; injected default model and read-only MCP. "
-
+IDENTITY_NA=0
+E2E_NOTE="Native dashboard; paired owner tunnel; encrypted Matrix before/after native restart; injected default model and read-only MCP. "
+# 分流机的上游凭据文件（Mac magpie 的一次性网关凭据），同 codex.sh 等 Agent 包装。
+E2E_REMOTE_MODEL_KEY="$HOME/wonton-dev/secrets/agent-smoke.key"
 hermes_preflight_images() {
   local image
   for image in "${WONTON_CORE_IMAGE:-wonton-core:e2e-main}" \
@@ -54,6 +57,73 @@ hermes_wait_healthy() {
   done
   echo 'Gateway did not become healthy within 180 seconds' >&2
   return 1
+}
+
+hermes_dashboard_request() {
+  local method="$1" path="$2"
+  curl -sS --noproxy '*' --fail-with-body --max-time 30 \
+    -b "$E2E_JAR" -c "$E2E_JAR" -X "$method" \
+    -H "X-Hermes-Session-Token: $HERMES_DASH_TOKEN" "$HERMES_WEB_URL$path"
+}
+
+hermes_dashboard_page() {
+  local page
+  page="$(curl -sS --noproxy '*' --fail-with-body --max-time 30 -L \
+    -b "$E2E_JAR" -c "$E2E_JAR" -H 'Accept: text/html' "$HERMES_WEB_URL/")" || return 1
+  # Same page-injected session token and header as upstream web/src/lib/api.ts.
+  # A raw fetch with no token is expected to fail even after the Wonton owner login.
+  HERMES_DASH_TOKEN="$(python3 -c 'import re,sys
+page=sys.stdin.read()
+m=re.search(r"window\.__HERMES_SESSION_TOKEN__=\"([^\"]+)\"", page)
+if not m or "<title>" not in page or "hermes" not in page.lower():
+    raise SystemExit("Native Hermes page/session token missing")
+print(m.group(1))' <<<"$page")" || return 1
+  [[ -n "$HERMES_DASH_TOKEN" ]]
+}
+
+hermes_dashboard_smoke() {
+  local plugins code identity status channels
+  plugins="$(e2e_api GET /_wonton/api/plugins 2>>"$LOG")" || {
+    fail 网页打得开 'Cannot list this instance plugins'; return 1;
+  }
+  HERMES_WEB_URL="$(jq -er --arg id "$E2E_NAME_ID" '.plugins[] | select(.id == $id) | .web_url | strings | select(length > 0)' <<<"$plugins")" || {
+    fail 网页打得开 'No default-Bot web_url (requires core base #180/spec 0.7)'; return 1;
+  }
+  HERMES_WEB_URL="$(python3 -c 'import sys,urllib.parse
+url=urllib.parse.urlsplit(sys.argv[1])
+if url.scheme not in ("http", "https") or not url.netloc: raise SystemExit("Invalid plugin web URL")
+print(urllib.parse.urlunsplit((url.scheme,url.netloc,"","","")))' "$HERMES_WEB_URL")" || return 1
+  code="$(curl -sS --noproxy '*' --max-time 30 -o /dev/null -w '%{http_code}' \
+    -H 'Accept: application/json' "$HERMES_WEB_URL/api/auth/me")" || {
+    fail 网页打得开 'Anonymous dashboard probe could not connect'; return 1;
+  }
+  [[ "$code" == 401 ]] || { fail 网页打得开 "Anonymous identity endpoint returned $code, expected 401"; return 1; }
+  curl -sS --noproxy '*' --fail-with-body --max-time 30 -o /dev/null -c "$E2E_JAR" \
+    --data-urlencode "token=$E2E_TOKEN" "$E2E_BASE/_wonton/login" || {
+    fail 主人身份能用 'Owner login failed'; return 1;
+  }
+  hermes_dashboard_page || { fail 网页打得开 'Native HTML/session token missing'; return 1; }
+  identity="$(hermes_dashboard_request GET /api/auth/me)" || {
+    fail 主人身份能用 'Native session-token identity request failed'; return 1;
+  }
+  jq -e '.user_id == "local" and .provider == "loopback"' <<<"$identity" >/dev/null || {
+    fail 主人身份能用 'Unexpected native dashboard identity'; return 1;
+  }
+  status="$(hermes_dashboard_request GET /api/status)" || {
+    fail 网页打得开 'Native status endpoint failed'; return 1;
+  }
+  jq -e '.gateway_running == true and (.gateway_pid | type == "number")' <<<"$status" >/dev/null || {
+    fail 网页打得开 'Native dashboard does not see a running gateway'; return 1;
+  }
+  HERMES_BEFORE_PID="$(jq -r .gateway_pid <<<"$status")"
+  channels="$(hermes_dashboard_request GET '/api/messaging/platforms?profile=default')" || {
+    fail 网页打得开 'Native Channels endpoint failed'; return 1;
+  }
+  jq -e '[.platforms[].id] as $ids | ["telegram", "matrix", "feishu", "wecom"] | all(. as $id | $ids | index($id) != null)' <<<"$channels" >/dev/null || {
+    fail 网页打得开 'Native Channels response omitted a required channel'; return 1;
+  }
+  pass 网页打得开 'Native Hermes HTML, authenticated status and Channels endpoints; anonymous API rejected (401)'
+  pass 主人身份能用 'Wonton owner session reaches native loopback identity using page-injected token (not a separate Hermes account)'
 }
 
 hermes_pair_owner() {
@@ -105,26 +175,128 @@ hermes_matrix_reply() {
     --room "$HERMES_ROOM" --bot "$HERMES_BOT" --reply any --settle 5 --wait 180 \
     --text "$text" >"$out" 2>&1 || { cat "$out" >>"$LOG"; return 1; }
   cat "$out" >>"$LOG"
-  # /version is a real native gateway command: encryption can be checked without a model
-  # provider. The version follows the compose-pinned upstream image (v0.22.5).
-  # Do not count an encrypted error message as a successful model turn.
+  # /version is a real native gateway command: encryption/restart can be checked without
+  # a model provider. Do not count an encrypted error message as a successful model turn.
   if [[ "$text" == /version ]]; then
-    grep -qF '0.22.5' "$out"
+    grep -qF '0.22.7' "$out"
   else
     grep -qF "$HERMES_MODEL_MARKER" "$out"
   fi
 }
 
-hermes_gateway_restart() {
-  local before after
-  before="$(docker inspect "$HERMES_GW" --format '{{.Id}}')" || return 1
-  docker restart "$HERMES_GW" >>"$LOG" 2>&1 || return 1
+hermes_native_restart() {
+  local action action_pid status i after container_before container_after
+  container_before="$(docker inspect "$HERMES_GW" --format '{{.Id}} {{.State.StartedAt}}')" || return 1
+  action="$(hermes_dashboard_request POST '/api/gateway/restart?profile=default')" || return 1
+  action_pid="$(jq -er 'select(.ok == true and .name == "gateway-restart") | .pid | numbers' <<<"$action")" || return 1
+  for ((i = 0; i < 90; i++)); do
+    status="$(hermes_dashboard_request GET '/api/actions/gateway-restart/status?lines=200')" || return 1
+    jq -e --argjson pid "$action_pid" '.pid == $pid and .name == "gateway-restart"' <<<"$status" >/dev/null || return 1
+    if jq -e '.running == false and .exit_code != null' <<<"$status" >/dev/null; then
+      printf '%s\n' "$status" >"$HERMES_WORK/restart.json"
+      jq -e '.exit_code == 0' <<<"$status" >/dev/null || return 1
+      break
+    fi
+    sleep 2
+  done
+  ((i < 90)) || { echo 'Native restart action timed out' >&2; return 1; }
+  for ((i = 0; i < 90; i++)); do
+    after="$(hermes_dashboard_request GET /api/status)" || return 1
+    if jq -e --argjson old "$HERMES_BEFORE_PID" \
+      '.gateway_running == true and (.gateway_pid | type == "number") and .gateway_pid != $old' <<<"$after" >/dev/null; then
+      break
+    fi
+    sleep 2
+  done
+  ((i < 90)) || { echo 'Native restart did not produce a new live gateway PID' >&2; return 1; }
   hermes_wait_healthy || return 1
-  after="$(docker inspect "$HERMES_GW" --format '{{.Id}} {{.State.StartedAt}}')"
-  [[ "$after" == "$before "* ]] || {
-    echo 'Gateway container was replaced instead of restarted' >&2
-    return 1
+  container_after="$(docker inspect "$HERMES_GW" --format '{{.Id}} {{.State.StartedAt}}')" || return 1
+  [[ "$container_before" == "$container_after" ]] || {
+    echo 'Native restart unexpectedly replaced/restarted the container' >&2; return 1;
   }
+  hermes_dashboard_page || return 1
+  hermes_dashboard_request GET /api/auth/me | jq -e '.user_id == "local" and .provider == "loopback"' >/dev/null
+}
+
+# 把本实例的 magpie 上游指到模型网关：npchy 用宿主 magpie（容器经网络网关直连），分流机用 Mac
+# 上的 magpie（地址 E2E_REMOTE_MAGPIE_URL，凭据由场主放在 E2E_REMOTE_MODEL_KEY）。容器带 Docker
+# 客户端注入的代理变量，连这些地址要显式 no_proxy 直连。npchy 先用占位值探测，要凭据时新建一次性
+# 网关凭据，agent_cleanup 里删掉；分流机只读 key 文件。
+hermes_configure_magpie_upstream() {
+  local magpie_ctr magpie_net gw_ip code key probe_list gw wait_i picked key_name
+  local remote_base remote_host upstream_url models_json want
+  magpie_ctr="wonton-$E2E_INSTANCE--ai-usemagpie-magpie--magpie"
+  magpie_net="wonton-$E2E_INSTANCE--ai-usemagpie-magpie"
+  docker inspect "$magpie_ctr" >/dev/null 2>&1 || { fail 模型能回话 "smoke 实例没有 magpie 容器"; return 1; }
+  if [[ -n ${E2E_ON_REMOTE:-} ]]; then
+    [[ -f $E2E_REMOTE_MODEL_KEY ]] || { echo "分流机没有上游凭据文件"; return 1; }
+    want="${E2E_UPSTREAM_MODEL:-remote-magpie/jc/glm-5.3-flash}"
+    remote_base="${E2E_REMOTE_MAGPIE_URL:-http://192.168.0.31:3425}"
+    remote_host="$(sed -E 's#^https?://([^/:]+).*#\1#' <<<"$remote_base")"
+    probe_list="localhost,127.0.0.1,$remote_host"
+    upstream_url="$remote_base/v1"
+    key="$(cat "$E2E_REMOTE_MODEL_KEY")"
+  else
+    # 本机上游是宿主 magpie 自己的路由（auto/…）；场主按 Mac 上的裸 id 设了值时按后缀找。
+    want="${E2E_UPSTREAM_MODEL:-auto/glm-5.3-flash}"
+    gw_ip="$(docker network inspect "$magpie_net" --format '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null)" || { fail 模型能回话 "拿不到 magpie 网络网关"; return 1; }
+    probe_list="host.docker.internal,$gw_ip,localhost,127.0.0.1"
+    upstream_url="http://$gw_ip:3425/v1"
+    code="$(docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+      curl -sS --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 10 \
+      -H 'Authorization: Bearer placeholder' "http://$gw_ip:3425/v1/models" 2>>"$LOG" || true)"
+    key=placeholder
+    if [[ "$code" != 200 ]]; then
+      key_name="wonton-smoke-hermes-$E2E_INSTANCE"
+      key="$(openssl rand -hex 24)"
+      # add 会回显密钥，不能进日志；remove 接收 id，不接受名称。
+      if ! magpie gateway-key add "$key_name" --key - <<<"$key" >/dev/null 2>&1; then
+        fail 模型能回话 "宿主 magpie 建不了一次性网关凭据"
+        return 1
+      fi
+      E2E_HOST_MODEL_KEY_ID="$(magpie gateway-key list | awk -v name="$key_name" '$2 == name {print $1}')"
+      [[ -n "$E2E_HOST_MODEL_KEY_ID" ]] || { fail 模型能回话 "找不到新建凭据的 id"; return 1; }
+      export E2E_HOST_MODEL_KEY_ID
+    fi
+  fi
+  models_json="$(docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+    curl --fail --silent --show-error --noproxy '*' --max-time 10 \
+    -H "Authorization: Bearer $key" "$upstream_url/models" 2>>"$LOG")" ||
+    { fail 模型能回话 "上游模型列表请求失败"; return 1; }
+  # 精确 id；否则按后缀（宿主 magpie 的 id 带自己的 provider 前缀）；本机再退回 auto 路由。
+  picked="$(jq -r --arg want "$want" \
+    '[.data[].id] | (map(select(. == $want))[0] // map(select(endswith("/" + $want)))[0] // empty)' <<<"$models_json")"
+  if [[ -z $picked && -z ${E2E_ON_REMOTE:-} ]]; then
+    picked="$(jq -r '[.data[].id] | map(select(. == "auto/glm-5.3-flash"))[0] // empty' <<<"$models_json")"
+  fi
+  [[ -n $picked ]] || { fail 模型能回话 "上游模型列表里没有 $want"; return 1; }
+  say "上游模型：$picked"
+  if ! docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+      magpie provider add upstream "url=$upstream_url" "key=$key" "models=$picked" >>"$LOG" 2>&1; then
+    fail 模型能回话 "实例模型网关配置上游失败"
+    return 1
+  fi
+  # 这版 magpie 的 add 不保证把模型暴露出来，按它自己的提示显式暴露一次。
+  docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+    magpie provider models upstream "+$picked" >>"$LOG" 2>&1 ||
+    { fail 模型能回话 "实例模型网关暴露上游模型失败"; return 1; }
+  # provider 变化后默认路由组重建，核心可能重建这个 Bot 的容器来注入新 env：每轮重新取容器和变量，
+  # 等到路由组在网关模型列表里出现（`group/…` 不会作为 id 返回，判据是列表非空）。
+  for wait_i in $(seq 1 90); do
+    gw="$(e2e_svc "$E2E_NAME_ID" gateway 2>/dev/null)" || { sleep 2; continue; }
+    if [[ -n $gw ]] && docker exec -e no_proxy="models.wonton.internal,localhost,127.0.0.1" \
+      -e NO_PROXY="models.wonton.internal,localhost,127.0.0.1" "$gw" \
+      /opt/hermes/.venv/bin/python -c 'import json, os, urllib.request
+req = urllib.request.Request(os.environ["WONTON_MODEL_BASE_URL"] + "/models",
+                             headers={"Authorization": "Bearer " + os.environ["WONTON_MODEL_API_KEY"]})
+data = json.load(urllib.request.urlopen(req, timeout=10))
+raise SystemExit(0 if data["data"] else 1)' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  fail 模型能回话 "默认路由组 180 秒内未就绪"
+  return 1
 }
 
 hermes_model_sdk() {
@@ -194,7 +366,7 @@ hermes_mcp_smoke() {
 }
 
 agent_smoke() {
-  local model_rc=0 encrypted_ok=0 encrypted_failure=''
+  local model_rc=0 dashboard_ok=0 encrypted_ok=0 encrypted_failure=''
   HERMES_CORE="wonton-$E2E_INSTANCE--core"
   HERMES_GW="$(e2e_svc "$E2E_NAME_ID" gateway)"
   HERMES_WORK="$(mktemp -d "$E2E/work/hermes.$E2E_INSTANCE.XXXXXX")" || {
@@ -215,46 +387,65 @@ agent_smoke() {
     untested MCP工具 'Gateway prerequisite failed'
     return
   fi
+  hermes_dashboard_smoke >>"$LOG" 2>&1 && dashboard_ok=1
   if hermes_pair_owner >>"$LOG" 2>&1 && hermes_matrix_reply /version before >>"$LOG" 2>&1; then
     encrypted_ok=1
     say 'Paired owner tunnel: encrypted native /version reply before restart succeeded'
   else
     encrypted_failure='Owner tunnel pairing or first encrypted native /version reply failed'
   fi
-  if ((encrypted_ok)); then
-    if hermes_gateway_restart >>"$LOG" 2>&1 && hermes_matrix_reply /version after >>"$LOG" 2>&1; then
-      say 'Gateway process restarted without container replacement; encrypted /version still works'
+  if ((dashboard_ok)); then
+    if hermes_native_restart >>"$LOG" 2>&1; then
+      if ((encrypted_ok)) && hermes_matrix_reply /version after >>"$LOG" 2>&1; then
+        say 'Native gateway PID changed without container restart; encrypted /version still works'
+      else
+        encrypted_failure="${encrypted_failure:+$encrypted_failure; }encrypted reply after native restart failed or pairing unavailable"
+      fi
     else
-      encrypted_failure='encrypted reply after gateway process restart failed'
+      encrypted_failure="${encrypted_failure:+$encrypted_failure; }native dashboard restart failed (no Docker fallback)"
     fi
+  else
+    encrypted_failure="${encrypted_failure:+$encrypted_failure; }after-restart check blocked by native dashboard failure"
   fi
   if [[ -z "$encrypted_failure" ]]; then
-    pass 加密私聊 'Paired owner tunnel: encrypted replies before/after gateway process restart; same container, crypto state reloaded from the Bot data dir'
+    pass 加密私聊 'Paired owner tunnel: encrypted replies before/after successful native gateway restart; new PID, same container'
   else
     fail 加密私聊 "$encrypted_failure; see evidence/log"
   fi
   HERMES_MODEL_MARKER="HERMES_E2E_$E2E_INSTANCE"
-  hermes_model_sdk >"$HERMES_WORK/model.log" 2>&1 || model_rc=$?
-  cat "$HERMES_WORK/model.log" >>"$LOG"
-  case "$model_rc" in
-    0)
-      if ((encrypted_ok)) && hermes_matrix_reply "Reply with exactly: $HERMES_MODEL_MARKER" model >>"$LOG" 2>&1; then
-        pass 模型能回话 'Injected default route answered via Python SDK and native encrypted Matrix reply matched marker'
-      elif ((encrypted_ok)); then
-        fail 模型能回话 'SDK answered but native encrypted Matrix model reply failed/mismatched'
-      else
-        untested 模型能回话 'SDK answered, but encrypted Matrix path was unavailable; not a full Agent PASS'
-      fi ;;
-    3) untested 模型能回话 'Default model prerequisites unavailable; no provider provisioning attempted; see model.log' ;;
-    4)
-      fail 模型能回话 'Model API authentication rejected (401/403); stopped without host credentials or host changes'
-      untested MCP工具 'Stopped after model authentication rejection'
-      return ;;
-    *) fail 模型能回话 'Real default-model SDK request failed; see model.log (no retries)' ;;
-  esac
+  if [[ -n ${E2E_ON_REMOTE:-} && ! -f $E2E_REMOTE_MODEL_KEY ]]; then
+    untested 模型能回话 '分流机上没有上游凭据文件'
+  elif hermes_configure_magpie_upstream >>"$LOG" 2>&1; then
+    hermes_model_sdk >"$HERMES_WORK/model.log" 2>&1 || model_rc=$?
+    cat "$HERMES_WORK/model.log" >>"$LOG"
+    case "$model_rc" in
+      0)
+        if ((encrypted_ok)) && hermes_matrix_reply "Reply with exactly: $HERMES_MODEL_MARKER" model >>"$LOG" 2>&1; then
+          pass 模型能回话 'Injected default route answered via Python SDK and native encrypted Matrix reply matched marker'
+        elif ((encrypted_ok)); then
+          fail 模型能回话 'SDK answered but native encrypted Matrix model reply failed/mismatched'
+        else
+          untested 模型能回话 'SDK answered, but encrypted Matrix path was unavailable; not a full Agent PASS'
+        fi ;;
+      3) untested 模型能回话 'Default model prerequisites unavailable; see model.log' ;;
+      4)
+        fail 模型能回话 'Model API authentication rejected (401/403); stopped without host credentials or host changes'
+        untested MCP工具 'Stopped after model authentication rejection'
+        return ;;
+      *) fail 模型能回话 'Real default-model SDK request failed; see model.log (no retries)' ;;
+    esac
+  fi
   if hermes_mcp_smoke >>"$LOG" 2>&1; then
     pass MCP工具 'Hermes Python MCP SDK: initialize, tools/list and read-only wonton__list_plugins returned this installed plugin'
   else
     fail MCP工具 'Hermes Python MCP SDK list/call failed or result omitted this installed plugin; see evidence/log'
+  fi
+}
+
+agent_cleanup() {
+  # hermes_configure_magpie_upstream 在宿主 magpie 上新建的一次性网关凭据，跑完就删；
+  # 分流机分支不建凭据（E2E_HOST_MODEL_KEY_ID 不会被设置），这段自然不执行。
+  if [[ -n "${E2E_HOST_MODEL_KEY_ID:-}" ]]; then
+    magpie gateway-key remove "$E2E_HOST_MODEL_KEY_ID" >/dev/null 2>&1 || { fail 清理 "一次性模型凭据删除失败"; return 1; }
   fi
 }
