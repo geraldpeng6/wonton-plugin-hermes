@@ -271,22 +271,22 @@ hermes_configure_magpie_upstream() {
     fail 模型能回话 "实例模型网关配置上游失败"
     return 1
   fi
-  # provider 变化后 default-model 约两秒内重建路由组：轮询到它出现在网关模型列表再返回。
-  gw="$(e2e_svc "$E2E_NAME_ID" gateway)"
-  for wait_i in $(seq 1 30); do
-    if docker exec -e no_proxy="models.wonton.internal,localhost,127.0.0.1" \
+  # provider 变化后默认路由组重建，核心可能重建这个 Bot 的容器来注入新 env：每轮重新取容器和变量，
+  # 等到路由组在网关模型列表里出现（`group/…` 不会作为 id 返回，判据是列表非空）。
+  for wait_i in $(seq 1 90); do
+    gw="$(e2e_svc "$E2E_NAME_ID" gateway 2>/dev/null)" || { sleep 2; continue; }
+    if [[ -n $gw ]] && docker exec -e no_proxy="models.wonton.internal,localhost,127.0.0.1" \
       -e NO_PROXY="models.wonton.internal,localhost,127.0.0.1" "$gw" \
       /opt/hermes/.venv/bin/python -c 'import json, os, urllib.request
 req = urllib.request.Request(os.environ["WONTON_MODEL_BASE_URL"] + "/models",
                              headers={"Authorization": "Bearer " + os.environ["WONTON_MODEL_API_KEY"]})
 data = json.load(urllib.request.urlopen(req, timeout=10))
-raise SystemExit(0 if any(m["id"] == os.environ["WONTON_MODEL_DEFAULT"] for m in data["data"]) else 1)' \
-      >/dev/null 2>&1; then
+raise SystemExit(0 if data["data"] else 1)' >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
   done
-  fail 模型能回话 "默认路由组 60 秒内未就绪"
+  fail 模型能回话 "默认路由组 180 秒内未就绪"
   return 1
 }
 
