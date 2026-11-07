@@ -2,10 +2,11 @@
 # Sourced by the shared e2e/smoke.sh through plugins/hermes.sh, not a standalone runner.
 # Keeps the harness's stack slot, installation, reporting and instance-only cleanup.
 # Requires a prebuilt spec-0.7 core (base #180), tunnel-client, echo-bot and curl images;
-# no image builds, upstream rewrites, host credentials or model-provider provisioning.
-# Model settings must already expose a usable default route in this disposable instance.
-# Missing model prerequisites are UNTESTED, never PASS; an authentication rejection stops
-# the Agent checks without reading or changing any host credentials.
+# no image builds or upstream rewrites. The instance's magpie upstream is pointed at the
+# harness model gateway (same mechanism as the other Agent wrappers): on npchy through the
+# host magpie with an ephemeral gateway key, on a remote runner through the key file the
+# owner left for that machine. Missing prerequisites are UNTESTED, never PASS; an
+# authentication rejection stops the Agent checks without reading host configuration.
 # Logs/results may contain private runtime replies: keep the harness work directory private.
 #
 # 原生控制台步骤（页面注入令牌、/api/status、/api/gateway/restart、Channels 端点）依赖
@@ -17,6 +18,8 @@ SSO=none
 MCP=0
 IDENTITY_NA=0
 E2E_NOTE="Native dashboard; paired owner tunnel; encrypted Matrix before/after native restart; injected default model and read-only MCP. "
+# 分流机的上游凭据文件（Mac magpie 的一次性网关凭据），同 codex.sh 等 Agent 包装。
+E2E_REMOTE_MODEL_KEY="$HOME/wonton-dev/secrets/agent-smoke.key"
 hermes_preflight_images() {
   local image
   for image in "${WONTON_CORE_IMAGE:-wonton-core:e2e-main}" \
@@ -215,6 +218,78 @@ hermes_native_restart() {
   hermes_dashboard_request GET /api/auth/me | jq -e '.user_id == "local" and .provider == "loopback"' >/dev/null
 }
 
+# 把本实例的 magpie 上游指到模型网关：npchy 用宿主 magpie（容器经网络网关直连），分流机用 Mac
+# 上的 magpie（地址 E2E_REMOTE_MAGPIE_URL，凭据由场主放在 E2E_REMOTE_MODEL_KEY）。容器带 Docker
+# 客户端注入的代理变量，连这些地址要显式 no_proxy 直连。npchy 先用占位值探测，要凭据时新建一次性
+# 网关凭据，agent_cleanup 里删掉；分流机只读 key 文件。
+hermes_configure_magpie_upstream() {
+  local magpie_ctr magpie_net gw_ip code key probe_list gw wait_i picked key_name
+  local remote_base remote_host upstream_url
+  magpie_ctr="wonton-$E2E_INSTANCE--ai-usemagpie-magpie--magpie"
+  magpie_net="wonton-$E2E_INSTANCE--ai-usemagpie-magpie"
+  docker inspect "$magpie_ctr" >/dev/null 2>&1 || { fail 模型能回话 "smoke 实例没有 magpie 容器"; return 1; }
+  if [[ -n ${E2E_ON_REMOTE:-} ]]; then
+    [[ -f $E2E_REMOTE_MODEL_KEY ]] || { echo "分流机没有上游凭据文件"; return 1; }
+    picked="${E2E_UPSTREAM_MODEL:-remote-magpie/jc/glm-5.3-flash}"
+    remote_base="${E2E_REMOTE_MAGPIE_URL:-http://192.168.0.31:3425}"
+    remote_host="$(sed -E 's#^https?://([^/:]+).*#\1#' <<<"$remote_base")"
+    probe_list="localhost,127.0.0.1,$remote_host"
+    upstream_url="$remote_base/v1"
+    key="$(cat "$E2E_REMOTE_MODEL_KEY")"
+  else
+    picked="${E2E_UPSTREAM_MODEL:?需要明确设置验收用的上游模型}"
+    gw_ip="$(docker network inspect "$magpie_net" --format '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null)" || { fail 模型能回话 "拿不到 magpie 网络网关"; return 1; }
+    probe_list="host.docker.internal,$gw_ip,localhost,127.0.0.1"
+    upstream_url="http://$gw_ip:3425/v1"
+    code="$(docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+      curl -sS --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 10 \
+      -H 'Authorization: Bearer placeholder' "http://$gw_ip:3425/v1/models" 2>>"$LOG" || true)"
+    key=placeholder
+    if [[ "$code" != 200 ]]; then
+      key_name="wonton-smoke-hermes-$E2E_INSTANCE"
+      key="$(openssl rand -hex 24)"
+      # add 会回显密钥，不能进日志；remove 接收 id，不接受名称。
+      if ! magpie gateway-key add "$key_name" --key - <<<"$key" >/dev/null 2>&1; then
+        fail 模型能回话 "宿主 magpie 建不了一次性网关凭据"
+        return 1
+      fi
+      E2E_HOST_MODEL_KEY_ID="$(magpie gateway-key list | awk -v name="$key_name" '$2 == name {print $1}')"
+      [[ -n "$E2E_HOST_MODEL_KEY_ID" ]] || { fail 模型能回话 "找不到新建凭据的 id"; return 1; }
+      export E2E_HOST_MODEL_KEY_ID
+    fi
+  fi
+  if ! docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+      curl --fail --silent --show-error --noproxy '*' --max-time 10 \
+      -H "Authorization: Bearer $key" "$upstream_url/models" 2>>"$LOG" \
+      | jq -e --arg model "$picked" 'any(.data[]; .id == $model)' >/dev/null; then
+    fail 模型能回话 "指定上游模型不存在或模型列表请求失败"
+    return 1
+  fi
+  say "上游模型：$picked"
+  if ! docker exec -e no_proxy="$probe_list" -e NO_PROXY="$probe_list" "$magpie_ctr" \
+      magpie provider add upstream "url=$upstream_url" "key=$key" "models=$picked" >>"$LOG" 2>&1; then
+    fail 模型能回话 "实例模型网关配置上游失败"
+    return 1
+  fi
+  # provider 变化后 default-model 约两秒内重建路由组：轮询到它出现在网关模型列表再返回。
+  gw="$(e2e_svc "$E2E_NAME_ID" gateway)"
+  for wait_i in $(seq 1 30); do
+    if docker exec -e no_proxy="models.wonton.internal,localhost,127.0.0.1" \
+      -e NO_PROXY="models.wonton.internal,localhost,127.0.0.1" "$gw" \
+      /opt/hermes/.venv/bin/python -c 'import json, os, urllib.request
+req = urllib.request.Request(os.environ["WONTON_MODEL_BASE_URL"] + "/models",
+                             headers={"Authorization": "Bearer " + os.environ["WONTON_MODEL_API_KEY"]})
+data = json.load(urllib.request.urlopen(req, timeout=10))
+raise SystemExit(0 if any(m["id"] == os.environ["WONTON_MODEL_DEFAULT"] for m in data["data"]) else 1)' \
+      >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  fail 模型能回话 "默认路由组 60 秒内未就绪"
+  return 1
+}
+
 hermes_model_sdk() {
   # Uses only this Bot's injected model environment and the SDK shipped in Hermes.
   # No list-models requirement: this Bot's key may be scoped to the default route only.
@@ -329,27 +404,39 @@ agent_smoke() {
     fail 加密私聊 "$encrypted_failure; see evidence/log"
   fi
   HERMES_MODEL_MARKER="HERMES_E2E_$E2E_INSTANCE"
-  hermes_model_sdk >"$HERMES_WORK/model.log" 2>&1 || model_rc=$?
-  cat "$HERMES_WORK/model.log" >>"$LOG"
-  case "$model_rc" in
-    0)
-      if ((encrypted_ok)) && hermes_matrix_reply "Reply with exactly: $HERMES_MODEL_MARKER" model >>"$LOG" 2>&1; then
-        pass 模型能回话 'Injected default route answered via Python SDK and native encrypted Matrix reply matched marker'
-      elif ((encrypted_ok)); then
-        fail 模型能回话 'SDK answered but native encrypted Matrix model reply failed/mismatched'
-      else
-        untested 模型能回话 'SDK answered, but encrypted Matrix path was unavailable; not a full Agent PASS'
-      fi ;;
-    3) untested 模型能回话 'Default model prerequisites unavailable; no provider provisioning attempted; see model.log' ;;
-    4)
-      fail 模型能回话 'Model API authentication rejected (401/403); stopped without host credentials or host changes'
-      untested MCP工具 'Stopped after model authentication rejection'
-      return ;;
-    *) fail 模型能回话 'Real default-model SDK request failed; see model.log (no retries)' ;;
-  esac
+  if [[ -n ${E2E_ON_REMOTE:-} && ! -f $E2E_REMOTE_MODEL_KEY ]]; then
+    untested 模型能回话 '分流机上没有上游凭据文件'
+  elif hermes_configure_magpie_upstream >>"$LOG" 2>&1; then
+    hermes_model_sdk >"$HERMES_WORK/model.log" 2>&1 || model_rc=$?
+    cat "$HERMES_WORK/model.log" >>"$LOG"
+    case "$model_rc" in
+      0)
+        if ((encrypted_ok)) && hermes_matrix_reply "Reply with exactly: $HERMES_MODEL_MARKER" model >>"$LOG" 2>&1; then
+          pass 模型能回话 'Injected default route answered via Python SDK and native encrypted Matrix reply matched marker'
+        elif ((encrypted_ok)); then
+          fail 模型能回话 'SDK answered but native encrypted Matrix model reply failed/mismatched'
+        else
+          untested 模型能回话 'SDK answered, but encrypted Matrix path was unavailable; not a full Agent PASS'
+        fi ;;
+      3) untested 模型能回话 'Default model prerequisites unavailable; see model.log' ;;
+      4)
+        fail 模型能回话 'Model API authentication rejected (401/403); stopped without host credentials or host changes'
+        untested MCP工具 'Stopped after model authentication rejection'
+        return ;;
+      *) fail 模型能回话 'Real default-model SDK request failed; see model.log (no retries)' ;;
+    esac
+  fi
   if hermes_mcp_smoke >>"$LOG" 2>&1; then
     pass MCP工具 'Hermes Python MCP SDK: initialize, tools/list and read-only wonton__list_plugins returned this installed plugin'
   else
     fail MCP工具 'Hermes Python MCP SDK list/call failed or result omitted this installed plugin; see evidence/log'
+  fi
+}
+
+agent_cleanup() {
+  # hermes_configure_magpie_upstream 在宿主 magpie 上新建的一次性网关凭据，跑完就删；
+  # 分流机分支不建凭据（E2E_HOST_MODEL_KEY_ID 不会被设置），这段自然不执行。
+  if [[ -n "${E2E_HOST_MODEL_KEY_ID:-}" ]]; then
+    magpie gateway-key remove "$E2E_HOST_MODEL_KEY_ID" >/dev/null 2>&1 || { fail 清理 "一次性模型凭据删除失败"; return 1; }
   fi
 }
