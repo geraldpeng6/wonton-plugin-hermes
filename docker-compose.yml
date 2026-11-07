@@ -111,7 +111,7 @@ configs:
 x-wonton:
   spec: "0.4"
   id: com.nousresearch.hermes
-  version: 0.6.1
+  version: 0.6.2
   kind: agent
   title: { zh: Hermes, en: Hermes }
   description:
@@ -133,8 +133,8 @@ x-wonton:
 
       Messages travel in an encrypted Matrix chat. The model goes through the model gateway by default, so there is no key to fill in; without a gateway, add your own provider and key in Model settings and it will guide you there. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and reach the network, but not your shared folders or other plugins' data.
   release_notes:
-    zh: 初始化后将技能和插件目录交给网关用户，修复新建技能时的权限错误；保留已有技能和配置。
-    en: Assigns initialized skill and plugin directories to the gateway user, fixing skill creation permissions while preserving existing skills and configuration.
+    zh: 工具失败时说明未成功的步骤、原因和下一步；不把操作预告当成结果，不猜测本次是否经过主人确认。初始化后将技能和插件目录交给网关用户，修复新建技能时的权限错误；保留已有技能和配置。
+    en: Reports failed steps, causes and next actions from tool results; does not treat previews as outcomes or guess whether owner confirmation occurred. Assigns initialized skill and plugin directories to the gateway user, fixing skill creation permissions while preserving existing skills and configuration.
   agent:
     protocol: matrix
   bot:
