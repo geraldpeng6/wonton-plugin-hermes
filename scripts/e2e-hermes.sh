@@ -17,8 +17,6 @@
 MCP=0
 E2E_NOTE="Paired owner tunnel; encrypted Matrix across gateway process restart; injected default model and read-only MCP. "
 
-# Run from before_install so shared smoke.sh can report manifest/spec rejection first.
-# Never define build_images: all images are prebuilt, with no build/pull fallback.
 hermes_preflight_images() {
   local image
   for image in "${WONTON_CORE_IMAGE:-wonton-core:e2e-main}" \
@@ -32,26 +30,12 @@ hermes_preflight_images() {
   done
 }
 
-# Shared smoke.sh waits for the core's preinstalled Hermes before this hook, then
-# unconditionally calls dev.sh install (not reinstall). Remove only that instance's
-# installation, keeping Bot data, so the harness installs the checked-out manifest.
-# E2E_INSTANCE/E2E_NAME_ID are assigned AFTER installation; use instance/plugin_id here.
+# Run from before_install so shared smoke.sh can report manifest/spec rejection first.
+# Never define build_images: all images are prebuilt, with no build/pull fallback.
+# 卸预装不用这里做：2026-11-07 起 harness 在调用本钩子前自己卸掉核心预装的同 ID 插件
+# （e2e/logs/hermes.log: "是核心预装的，先连数据卸掉预装的那份"），这里只做镜像预检。
 before_install() {
-  local core="wonton-$instance--core" actual plugins
   hermes_preflight_images || return 1
-  [[ "$plugin_id" == com.nousresearch.hermes ]] || {
-    echo 'Refusing to replace a plugin other than Hermes' >&2; return 1;
-  }
-  actual="$(docker inspect "$core" --format '{{index .Config.Labels "wonton.instance"}}')" || return 1
-  [[ -n "$instance" && "$actual" == "$instance" ]] || {
-    echo 'Refusing to uninstall outside this smoke instance' >&2; return 1;
-  }
-  plugins="$(e2e_api GET /_wonton/api/plugins)" || return 1
-  jq -e '.plugins | type == "array"' <<<"$plugins" >/dev/null || return 1
-  if jq -e --arg id "$plugin_id" 'any(.plugins[]; .id == $id)' <<<"$plugins" >/dev/null; then
-    say 'Removing this instance preinstalled Hermes (keeping data) before checkout installation'
-    dev_in uninstall "$plugin_id" || return 1
-  fi
 }
 
 hermes_owned_container() {
