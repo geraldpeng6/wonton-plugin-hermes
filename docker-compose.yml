@@ -70,7 +70,8 @@ services:
       MATRIX_ACCESS_TOKEN: ${WONTON_MATRIX_ACCESS_TOKEN}
       # 私人 Bot 只接受主人的指令；主房间是核心替主人建的加密私聊，定时任务结果发到这里。
       # 变量名是 MATRIX_HOME_ROOM，不是 Hermes 插件清单里写的 MATRIX_HOME_CHANNEL。
-      MATRIX_ALLOWED_USERS: ${WONTON_MATRIX_OWNER}
+      # 名单变量 0.9 起改叫 WONTON_MATRIX_ALLOWED_USERS；旧核心只给旧名。
+      MATRIX_ALLOWED_USERS: ${WONTON_MATRIX_ALLOWED_USERS:-${WONTON_MATRIX_OWNER}}
       MATRIX_HOME_ROOM: ${WONTON_MATRIX_HOME_ROOM}
       # 主流客户端默认加密私聊；依赖缺失时直接失败，不静默退回明文。
       MATRIX_E2EE_MODE: required
@@ -137,7 +138,7 @@ configs:
 x-wonton:
   spec: "0.7"
   id: com.nousresearch.hermes
-  version: 0.6.3
+  version: 0.6.4
   kind: agent
   title: { zh: Hermes, en: Hermes }
   description:

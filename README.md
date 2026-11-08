@@ -380,7 +380,7 @@ README 的图标一节只留一句来源和商标说明，指向 `NOTICE`，不�
 ### 11. Agent、Bot、模型和工具
 
 - 要以 Bot 身份收发消息的插件申请 `matrix.bot`，可以用 `bot.display_name`（多语言）、`bot.avatar`（包里的图片）定显示名
-  和头像。核心替主人建好和 Bot 的加密私聊（`WONTON_MATRIX_HOME_ROOM`）；Bot 只接受 `WONTON_MATRIX_OWNER` 的指令。
+  和头像。核心替主人建好和 Bot 的加密私聊（`WONTON_MATRIX_HOME_ROOM`）；Bot 只接受 `WONTON_MATRIX_ALLOWED_USERS`（0.9 之前的核心叫 `WONTON_MATRIX_OWNER`）名单里的人的指令。
   一个插件要几个 Bot 时用 `bots`，每个 Bot 一组容器。
 - `kind: agent` 的插件要写 `agent.protocol`：`matrix`（Agent 自己登录 Matrix，要申请 `matrix.bot`）或 `acp`（经 ACP
   桥接入）。
