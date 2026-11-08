@@ -7,8 +7,14 @@
 # Bot 数据目录里能留下的只有 Matrix 会话加密状态和对话历史，钩子约束内（无 docker exec、无 Matrix 配对）
 # 够不到；加密私聊和会话重载在专项验收里实测。因此声明 DATA_NA=1，升级保数据、重装保数据按声明记 N/A。
 #
-# 核心预装了同 id 的 Hermes（版本不锁）：smoke 的 install 只装没装过的，先卸掉预装那份（保留数据），再装工作区版本。
-before_install() { probes_dev uninstall; }
+# 共享验收可能已卸掉预装的 Hermes；仍装着时才保留数据卸载，再由调用方安装工作区版本。
+before_install() {
+  local installed
+  installed="$(probes_dev status)" || return 1
+  if grep -q '^com\.nousresearch\.hermes[[:space:]]' <<<"$installed"; then
+    probes_dev uninstall
+  fi
+}
 
 DATA_NA=1
 IDENTITY_NA=1
