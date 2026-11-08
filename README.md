@@ -36,8 +36,6 @@ Channels 保存凭据到该 Bot 的 `.env`；“Restart to apply” 调用 `herm
 
 Telegram 显式使用核心注入的 `WONTON_PROXY_URL`；未配代理时为空，走直连。渠道凭据和白名单留在 Hermes 原生页面，不增加插件设置字段。没有真实 IM 凭据时只能验证错误反馈，不能据此声称真实渠道已连通。
 
-`scripts/e2e-hermes.sh` 是共享冒烟入口的 Hermes 专项实现：在共享 runner 的 `plugins/hermes.sh` 中 source 此文件，沿用 runner 的名额和清理机制。需要预先构建好的核心、隧道客户端、加密 Matrix 探针镜像；测试不会读取宿主凭据或替主人配置模型服务商。
-
 ## 准备
 
 - Docker Engine 28 或更新的版本，带 Compose 插件（`docker compose`）。Linux 上的 Docker Engine、macOS 上的 Docker Desktop 和

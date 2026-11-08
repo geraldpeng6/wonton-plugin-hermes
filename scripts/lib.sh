@@ -20,7 +20,7 @@ info() {
 need() {
   local tool
   for tool in "$@"; do
-    command -v "$tool" >/dev/null 2>&1 || die "没有找到 $tool，先装上它（见 README 的“准备”）"
+    command -v "$tool" >/dev/null 2>&1 || die "没有找到 $tool，先装上它（见 https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md#准备）"
   done
 }
 
@@ -42,17 +42,17 @@ core_image() {
 need_core_command() {
   local image usage status=0
   image="$(core_image)"
-  usage="$(docker run --rm "$image" plugin 2>&1)" || status=$?
+  usage="$(docker run --rm --network none "$image" plugin 2>&1)" || status=$?
   ((status != 125)) || die "运行不了核心镜像 $image：$usage"
   [[ "$usage" == *"plugin $1"* ]] ||
-    die "核心镜像 $image 太旧，没有 wonton-core plugin $1：换新版本，或用 WONTON_CORE_IMAGE 指定（见 README 的“开发环境”）"
+    die "核心镜像 $image 太旧，没有 wonton-core plugin $1：换新版本，或用 WONTON_CORE_IMAGE 指定（见 https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md#开发环境）"
 }
 
 # 在核心镜像里执行 wonton-core：in_core <插件包目录> <参数…>，目录只读挂在 /plugin。
 in_core() {
   local dir="$1"
   shift
-  docker run --rm -v "$dir:/plugin:ro" "$(core_image)" "$@"
+  docker run --rm --network none -v "$dir:/plugin:ro" "$(core_image)" "$@"
 }
 
 # `plugin check` 输出的第一行去掉“插件 ”，即“<ID> <版本>”。有不合格的地方时 check 的退出码是 1，第一行照常有；
@@ -73,4 +73,32 @@ plugin_version() {
   line="$(manifest_line)"
   [[ -n "$line" ]] || die "插件包解析不了，先运行 scripts/check.sh 看原因"
   echo "${line#* }"
+}
+
+# #121：宿主机给 Docker 客户端配了代理（config.json 的 proxies）时，docker CLI 建的每个容器都带上 HTTP_PROXY
+# 这类变量，容器里访问代理挡住的地址会报 proxyconnect tcp，极易误判成插件的问题。
+# strip_docker_proxies [目标目录]：把 config.json 复制一份去掉 proxies（凭据、context 留着），DOCKER_CONFIG 指过去，
+# 之后这个进程用 docker CLI 起的容器不再带代理。没配代理、读不了或目标就是原目录时原样保留，一个进程只剥一次。
+strip_docker_proxies() {
+  local docker_config="${DOCKER_CONFIG:-$HOME/.docker}" stripped target="${1:-$state/docker-config}"
+  [[ -n "${WONTON_DOCKER_PROXIES_STRIPPED:-}" ]] && return 0
+  WONTON_DOCKER_PROXIES_STRIPPED=1
+  [[ -f "$docker_config/config.json" ]] || return 0
+  stripped="$(python3 - "$docker_config/config.json" <<'PY'
+import json, sys
+try:
+    config = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(1)
+if config.pop("proxies", None) is None:
+    sys.exit(3)
+print(json.dumps(config))
+PY
+)" || return 0
+  [[ "$target" -ef "$docker_config" ]] && return 0
+  rm -rf "$target"
+  mkdir -p "$target"
+  cp -a "$docker_config/." "$target/"
+  printf '%s\n' "$stripped" >"$target/config.json"
+  export DOCKER_CONFIG="$target"
 }
