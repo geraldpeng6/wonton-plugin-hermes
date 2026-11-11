@@ -30,6 +30,8 @@ services:
       WONTON_MODEL_BASE_URL: ${WONTON_MODEL_BASE_URL}
       WONTON_MODEL_API_KEY: ${WONTON_MODEL_API_KEY}
       WONTON_MODEL_DEFAULT: ${WONTON_MODEL_DEFAULT}
+      # 平台 extra 里的 allow_admin_from 占位符由 init 换成这个值（Hermes 不展开 extra 的 ${VAR}）。
+      WONTON_MATRIX_ALLOWED_USERS: ${WONTON_MATRIX_ALLOWED_USERS:?需要主人的 Matrix 用户 ID}
     volumes:
       - ${WONTON_BOT_DATA}:/opt/data
     configs:
