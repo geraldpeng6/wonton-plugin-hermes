@@ -15,7 +15,12 @@
 命中上游危险规则的命令（递归删除、写系统配置、管道进 shell、容器生命周期等，按上游 `tools/approval.py` 的
 分类）先经上游审批层把关。初始配置显式写 `approvals.mode: smart`：辅助模型逐条评估，明显安全的自动放行，
 明确破坏性的自动拒绝，拿不准或守卫模型不可用的升级成人工审批，在发起它的聊天里出现，回答 yes/approve 或
-no/deny 后才执行；300 秒没人回答按拒绝处理（上游 fail-closed）。要每条命中危险规则的命令都人工放行，私聊发
+no/deny 后才执行；300 秒没人回答按拒绝处理（上游 fail-closed）。初始配置还给守卫带一份默认规则
+（`approvals.smart_policy`）：sudo/doas 提权、改系统配置（/etc、systemctl、crontab、shell 启动文件）、
+容器启停删（docker/podman 的 run/start/stop/restart/kill/rm、compose up/down）、工作区之外的删除，这四类里
+命中上游危险规则的命令一律升级成人工审批，不自动放行，其余照 smart。守卫只看得到上游危险规则命中的命令：
+普通 sudo、docker run、非递归 rm 这类单发的命令上游就不命中，不会出卡片。已装好的 Bot 重建容器时 init 补上
+这份规则，主人自己写过的守卫规则不动。要每条命中危险规则的命令都人工放行，私聊发
 `!approvals manual`，`!approvals smart` 改回默认；这个切换和 `!yolo` 只有管理员名单里的人能改（初始配置把
 `platforms.matrix.allow_admin_from` 写成核心注入名单的占位符，init 服务在容器创建时取名单第一个 ID——归属人
 ——写入，家人加进听名单也不会成为管理员）。已经装好的 Bot 配置不会被改写，重建容器时 init 会补上名单；

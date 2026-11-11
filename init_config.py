@@ -1,4 +1,5 @@
-# 每次创建容器时把数据目录里的 config.yaml 修到和注入值一致（Hermes 自己也会改写它，这里只动核心管的三处）。
+# 每次创建容器时把数据目录里的 config.yaml 修到和注入值一致（Hermes 自己也会改写它，这里只动核心管的三处），
+# 另补一处插件默认值。
 #
 # 1) gateway.trust_env：Matrix 适配器 v0.22.5–v0.22.7 解析代理时不传目标主机，NO_PROXY 不生效；继承
 #    HTTPS_PROXY 会把内部的 matrix.wonton.internal 发给出口代理而被 403 拒绝，所以关闭网关的环境代理。
@@ -7,11 +8,14 @@
 #    provider，模型要用户自己在设置里配；网关装好后核心重建容器，这里再把它启用回来。用户自己加的 provider
 #    不动。enabled 字段是 Hermes 认的（hermes_cli.config_providers.is_provider_enabled）。
 # 3) platforms.matrix.allow_admin_from：见下面第 3 块——占位符在这里换成注入值。
+# 4) approvals.smart_policy：包里 config.yaml 定的守卫默认规则，已有 Bot 的配置缺这项或留空时补上，
+#    主人自己写过的不动。
 # 已经装好的 Bot 也要有这些项，所以不写进包里的 config.yaml。`hermes config set` 在这里用不了：它降权运行，
 # 而这时数据目录还属于 root。
 import os
 
 from ruamel.yaml import YAML
+from ruamel.yaml.scalarstring import LiteralScalarString
 
 path = "/opt/data/config.yaml"
 yaml = YAML()
@@ -49,6 +53,21 @@ if isinstance(matrix, dict):
     admins = matrix.get("allow_admin_from")
     if isinstance(admins, str) and "${WONTON_MATRIX_ALLOWED_USERS}" in admins and allowed:
         matrix["allow_admin_from"] = allowed
+        changed = True
+
+# 4) approvals.smart_policy：默认值只存包里的 config.yaml 这一处（两份文本会漂移），补写时从这里取。
+#    配置里已有非空的 smart_policy 视为主人自定，不动；留空和缺失都按没有自定处理。
+with open("/seed/config.yaml") as f:
+    seed_policy = ((YAML().load(f) or {}).get("approvals") or {}).get("smart_policy")
+if isinstance(seed_policy, str) and seed_policy.strip():
+    approvals = config.get("approvals")
+    if not isinstance(approvals, dict):
+        approvals = {}
+        config["approvals"] = approvals
+    current = approvals.get("smart_policy")
+    if not (isinstance(current, str) and current.strip()):
+        # 字面量块写入，主人后来在 App 里编辑这份配置时读得清。
+        approvals["smart_policy"] = LiteralScalarString(seed_policy)
         changed = True
 
 if changed:

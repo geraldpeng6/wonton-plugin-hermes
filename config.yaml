@@ -64,6 +64,26 @@ sessions:
 # 经 Wonton MCP 的操作不走这里，仍由核心出确认卡片。
 approvals:
   mode: smart
+  # 守卫默认规则：上游 tools/approval_smart.py 把这段文本逐字拼进守卫模型的 system prompt（trusted 通道，
+  # v0.22.7）。英文书写、沿用上游 approval.py 的分类词，守卫照它把这几类判成 ESCALATE 转人工，不再自动放行。
+  # 守卫只看得到上游危险规则命中的命令：普通 sudo、doas、crontab、docker run/start/rm、compose up、
+  # 非递归 rm/rmdir 上游不命中，不会因此出卡片。init 只在本项缺失或为空时补同一份默认（取自包里的
+  # config.yaml），主人自己写的规则不动。
+  smart_policy: |
+    The following categories are always the owner's call: if the command does any of
+    these, respond ESCALATE (never APPROVE), even if it looks routine.
+    1. Privilege escalation: any command run through sudo or doas.
+    2. System configuration: writing or editing files under /etc, changing service state
+       with systemctl (start, stop, restart, reload, enable, disable, mask), editing
+       crontabs, or modifying shell startup files (~/.bashrc, ~/.zshrc, ~/.profile and
+       similar).
+    3. Container lifecycle: creating, starting, stopping, restarting, killing or removing
+       containers (docker/podman run/start/stop/restart/kill/rm), or bringing compose
+       stacks up or down.
+    4. Deletion outside the workspace: rm, rmdir, find -delete or similar removals whose
+       targets are not inside the agent's working directory (relative paths are inside;
+       absolute paths elsewhere are outside).
+    Everything not listed here follows the base rules above.
 
 # Wonton 的 Hermes 插件（包里的 wonton/，init 服务放进数据目录）：模型网关里还没有默认模型时，直接告诉主人去
 # 「模型设置」添加模型服务商，不把网关的报错发进聊天。
