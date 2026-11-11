@@ -12,8 +12,11 @@
 它们能读写这个 Bot 的数据目录（含密钥），能联网、能连局域网；没有挂载你的共享文件夹、宿主的其他目录和别的插件的数据。
 聊天或网页里的恶意指令可能诱导它把数据发出去或删掉。
 
-私聊发 `!approvals manual` 让命中危险规则的命令先问你，`!approvals smart` 恢复默认。
-如果这个会话开过 YOLO，需先发 `!yolo` 并确认回复是关闭，否则 `manual` 不会拦。
+命中上游危险规则的命令（递归删除、写系统配置、管道进 shell、容器生命周期等，按上游 `tools/approval.py` 的
+分类）默认先发进发起它的聊天，回答 yes/approve 或 no/deny 后才执行；300 秒没人回答按拒绝处理。这是初始配置里
+`approvals.mode: manual` 带来的默认；已经装好的 Bot 配置不会被改写，私聊发 `!approvals manual` 启用，
+`!approvals smart` 恢复上游默认。如果这个会话开过 YOLO，需先发 `!yolo` 并确认回复是关闭，否则 `manual` 不会拦。
+经 Wonton MCP 的操作（装卸插件等）不走这里，仍在 Wonton 私聊的确认卡片上批。
 
 ## 初始配置
 

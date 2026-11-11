@@ -54,6 +54,12 @@ group_sessions_per_user: true
 sessions:
   auto_prune: false
 
+# 危险命令先问主人：上游默认 smart 会自动放行低风险命令、把明确危险的直接拒绝，主人没有机会放行；manual 让
+# 命中上游危险规则的命令（递归删除、写系统配置、管道进 shell、容器生命周期等）一律在发起的聊天里等主人回答
+# yes/no。300 秒没人回答按拒绝处理（上游 fail-closed）。经 Wonton MCP 的操作不走这里，仍由核心出确认卡片。
+approvals:
+  mode: manual
+
 # Wonton 的 Hermes 插件（包里的 wonton/，init 服务放进数据目录）：模型网关里还没有默认模型时，直接告诉主人去
 # 「模型设置」添加模型服务商，不把网关的报错发进聊天。
 plugins:

@@ -147,7 +147,7 @@ configs:
 x-wonton:
   spec: "0.9"
   id: com.nousresearch.hermes
-  version: 0.6.6
+  version: 0.6.7
   kind: agent
   title: { zh: Hermes, en: Hermes }
   description:
@@ -173,8 +173,8 @@ x-wonton:
 
       Open the plugin page to configure Telegram, Feishu or WeCom for the default bot in Hermes' native Channels page. Telegram uses Wonton's outbound proxy.
   release_notes:
-    zh: 没有模型时的提示按说话人自己的语言回一条，入口名照 App 里的「应用 → 模型设置」；清单补 owner.identity 权限读家人的语言。
-    en: The no-model hint now answers in the speaker's own language, naming the Apps → Models entry as the app shows it; the manifest adds the owner.identity permission to read family members' languages.
+    zh: "危险命令审批默认 manual：命中危险规则的命令在发起的聊天里先问主人，回答 yes/no 后才执行。"
+    en: "Dangerous-command approvals now default to manual: commands matching the risky rules ask in the chat that raised them and run only after a yes."
   agent:
     protocol: matrix
   bot:
