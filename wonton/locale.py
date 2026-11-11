@@ -38,7 +38,7 @@ def choose(tags) -> str:
     for tag in tags:
         parts = str(tag).split("-")
         base, subtags = parts[0].lower(), {part.lower() for part in parts[1:]}
-        if base in ("en", "ja"):
+        if base in SUPPORTED:
             return base
         if base == "zh":
             return "zh-Hant" if "hant" in subtags or subtags & {"tw", "hk", "mo"} else "zh-Hans"
