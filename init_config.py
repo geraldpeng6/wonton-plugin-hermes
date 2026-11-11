@@ -40,8 +40,9 @@ if isinstance(magpie, dict):
         changed = True
 
 # 3) platforms.matrix.allow_admin_from：Hermes 只展开模型配置里的 ${VAR}，平台 extra 不展开；把名单占位符换成
-#    注入值，斜杠命令管理员（!approvals、!yolo）才真的只认名单里的人。已有 Bot 重建容器时同样修到一致。
-allowed = os.environ.get("WONTON_MATRIX_ALLOWED_USERS", "").strip()
+#    注入名单的第一个 ID（第一个就是归属人），家人加进 Bot 听的名单也不会拿到斜杠命令管理员。已有 Bot 重建
+#    容器时同样修到一致。
+allowed = os.environ.get("WONTON_MATRIX_ALLOWED_USERS", "").strip().split(",")[0].strip()
 platforms = config.get("platforms")
 matrix = platforms.get("matrix") if isinstance(platforms, dict) else None
 if isinstance(matrix, dict):

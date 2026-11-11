@@ -17,10 +17,9 @@
 明确破坏性的自动拒绝，拿不准或守卫模型不可用的升级成人工审批，在发起它的聊天里出现，回答 yes/approve 或
 no/deny 后才执行；300 秒没人回答按拒绝处理（上游 fail-closed）。要每条命中危险规则的命令都人工放行，私聊发
 `!approvals manual`，`!approvals smart` 改回默认；这个切换和 `!yolo` 只有管理员名单里的人能改（初始配置把
-`platforms.matrix.allow_admin_from` 指到核心注入的名单，占位符由 init 服务在容器创建时换成实际的用户 ID；
-这个 Bot 是归属人的私人 Bot，名单就是主人一人）。已经装好的 Bot 配置不会被改写，重建容器时 init 会把名单
-占位符补上；没有名单的老 Bot 门禁不生效，要收紧就重装或在 config.yaml 的 `platforms.matrix` 下手动加
-`allow_admin_from`。
+`platforms.matrix.allow_admin_from` 写成核心注入名单的占位符，init 服务在容器创建时取名单第一个 ID——归属人
+——写入，家人加进听名单也不会成为管理员）。已经装好的 Bot 配置不会被改写，重建容器时 init 会补上名单；
+没有名单的老 Bot 门禁不生效，要收紧就重装或在 config.yaml 的 `platforms.matrix` 下手动加 `allow_admin_from`。
 经 Wonton MCP 的操作（装卸插件等）不走这里，确认卡片出现在发起的聊天里。
 
 ## 初始配置

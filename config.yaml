@@ -30,7 +30,7 @@ platforms:
     auto_thread: false
     gateway_restart_notification: false
     # 斜杠命令管理员（DM 范围）：!approvals 和 !yolo 只认名单里的人。核心注入的 WONTON_MATRIX_ALLOWED_USERS
-    # 是 Bot 听的人，当前只有归属人一人，等同「只有主人」；家人上线后核心若没有只含主人的变量，这里要重新收窄。
+    # 是 Bot 听的人（逗号分隔，第一个是归属人）；init 只取第一个 ID 写进来，家人加进听名单也拿不到审批开关。
     allow_admin_from: "${WONTON_MATRIX_ALLOWED_USERS}"
 
 # 只收发消息：Matrix 里不展示工具调用和推理，只发回答。要主人确认的工具（装卸插件等）会一直等主人回答，所以
