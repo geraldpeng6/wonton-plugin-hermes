@@ -13,10 +13,12 @@
 聊天或网页里的恶意指令可能诱导它把数据发出去或删掉。
 
 命中上游危险规则的命令（递归删除、写系统配置、管道进 shell、容器生命周期等，按上游 `tools/approval.py` 的
-分类）默认先发进发起它的聊天，回答 yes/approve 或 no/deny 后才执行；300 秒没人回答按拒绝处理。这是初始配置里
-`approvals.mode: manual` 带来的默认；已经装好的 Bot 配置不会被改写，私聊发 `!approvals manual` 启用，
-`!approvals smart` 恢复上游默认。如果这个会话开过 YOLO，需先发 `!yolo` 并确认回复是关闭，否则 `manual` 不会拦。
-经 Wonton MCP 的操作（装卸插件等）不走这里，仍在 Wonton 私聊的确认卡片上批。
+分类）先经上游审批层把关。初始配置显式写 `approvals.mode: smart`：辅助模型逐条评估，明显安全的自动放行，
+明确破坏性的自动拒绝，拿不准或守卫模型不可用的升级成人工审批，在发起它的聊天里出现，回答 yes/approve 或
+no/deny 后才执行；300 秒没人回答按拒绝处理（上游 fail-closed）。要每条命中危险规则的命令都人工放行，私聊发
+`!approvals manual`，`!approvals smart` 改回默认；这个切换和 `!yolo` 只有管理员名单里的人能改（初始配置把
+`platforms.matrix.allow_admin_from` 指到核心注入的名单，当前就是归属人一人）。已经装好的 Bot 配置不会被改写。
+经 Wonton MCP 的操作（装卸插件等）不走这里，确认卡片出现在发起的聊天里。
 
 ## 初始配置
 

@@ -29,9 +29,12 @@ platforms:
     reactions: false
     auto_thread: false
     gateway_restart_notification: false
+    # 斜杠命令管理员（DM 范围）：!approvals 和 !yolo 只认名单里的人。核心注入的 WONTON_MATRIX_ALLOWED_USERS
+    # 是 Bot 听的人，当前只有归属人一人，等同「只有主人」；家人上线后核心若没有只含主人的变量，这里要重新收窄。
+    allow_admin_from: "${WONTON_MATRIX_ALLOWED_USERS}"
 
 # 只收发消息：Matrix 里不展示工具调用和推理，只发回答。要主人确认的工具（装卸插件等）会一直等主人回答，所以
-# 打开中间消息：模型在调用前说的那句话（“请到 Wonton 私聊里确认”）先发出去，主人才知道要去确认。
+# 打开中间消息：模型在调用前说的那句话（告诉主人要确认）先发出去；确认卡片出现在发起的聊天里，主人才知道去确认。
 display:
   # Bot 忙时收到的新消息排队，按顺序逐条回答；不打断当前回答，也不发“正在打断”之类的提示。
   busy_input_mode: queue
@@ -54,11 +57,13 @@ group_sessions_per_user: true
 sessions:
   auto_prune: false
 
-# 危险命令先问主人：上游默认 smart 会自动放行低风险命令、把明确危险的直接拒绝，主人没有机会放行；manual 让
-# 命中上游危险规则的命令（递归删除、写系统配置、管道进 shell、容器生命周期等）一律在发起的聊天里等主人回答
-# yes/no。300 秒没人回答按拒绝处理（上游 fail-closed）。经 Wonton MCP 的操作不走这里，仍由核心出确认卡片。
+# 危险命令先经上游审批：显式写 smart（与上游默认一致，不依赖默认值）。命中上游危险规则的命令由辅助模型的
+# 「守卫」逐条评估：明显安全的放行，明确破坏性的拒绝，拿不准或守卫不可用的升级成人工审批，在发起的聊天里等
+# 主人回答；300 秒没人回答按拒绝处理（上游 fail-closed）。要每条命中危险规则的命令都人工放行，私聊发
+# `!approvals manual`；这个切换和 `!yolo` 只有管理员名单里的人能改（见 platforms.matrix.allow_admin_from）。
+# 经 Wonton MCP 的操作不走这里，仍由核心出确认卡片。
 approvals:
-  mode: manual
+  mode: smart
 
 # Wonton 的 Hermes 插件（包里的 wonton/，init 服务放进数据目录）：模型网关里还没有默认模型时，直接告诉主人去
 # 「模型设置」添加模型服务商，不把网关的报错发进聊天。

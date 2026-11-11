@@ -173,8 +173,8 @@ x-wonton:
 
       Open the plugin page to configure Telegram, Feishu or WeCom for the default bot in Hermes' native Channels page. Telegram uses Wonton's outbound proxy.
   release_notes:
-    zh: "危险命令审批默认 manual：命中危险规则的命令在发起的聊天里先问主人，回答 yes/no 后才执行。"
-    en: "Dangerous-command approvals now default to manual: commands matching the risky rules ask in the chat that raised them and run only after a yes."
+    zh: "危险命令审批显式用 smart：辅助模型逐条评估，拿不准的在发起的聊天里问主人；!approvals 和 !yolo 只有主人能改。"
+    en: "Dangerous-command approvals explicitly use smart mode: an auxiliary model triages commands and uncertain ones ask in the chat that raised them; !approvals and !yolo are owner-only."
   agent:
     protocol: matrix
   bot:
