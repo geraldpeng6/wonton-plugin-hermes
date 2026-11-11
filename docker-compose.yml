@@ -30,6 +30,8 @@ services:
       WONTON_MODEL_BASE_URL: ${WONTON_MODEL_BASE_URL}
       WONTON_MODEL_API_KEY: ${WONTON_MODEL_API_KEY}
       WONTON_MODEL_DEFAULT: ${WONTON_MODEL_DEFAULT}
+      # 平台 extra 里的 allow_admin_from 占位符由 init 换成这个值（Hermes 不展开 extra 的 ${VAR}）。
+      WONTON_MATRIX_ALLOWED_USERS: ${WONTON_MATRIX_ALLOWED_USERS:?需要主人的 Matrix 用户 ID}
     volumes:
       - ${WONTON_BOT_DATA}:/opt/data
     configs:
@@ -147,7 +149,7 @@ configs:
 x-wonton:
   spec: "0.9"
   id: com.nousresearch.hermes
-  version: 0.6.6
+  version: 0.6.7
   kind: agent
   title: { zh: Hermes, en: Hermes }
   description:
@@ -173,8 +175,8 @@ x-wonton:
 
       Open the plugin page to configure Telegram, Feishu or WeCom for the default bot in Hermes' native Channels page. Telegram uses Wonton's outbound proxy.
   release_notes:
-    zh: 没有模型时的提示按说话人自己的语言回一条，入口名照 App 里的「应用 → 模型设置」；清单补 owner.identity 权限读家人的语言。
-    en: The no-model hint now answers in the speaker's own language, naming the Apps → Models entry as the app shows it; the manifest adds the owner.identity permission to read family members' languages.
+    zh: "危险命令审批显式用 smart：辅助模型逐条评估，拿不准的在发起的聊天里问主人；!approvals 和 !yolo 只有主人能改。"
+    en: "Dangerous-command approvals explicitly use smart mode: an auxiliary model triages commands and uncertain ones ask in the chat that raised them; !approvals and !yolo are owner-only."
   agent:
     protocol: matrix
   bot:

@@ -12,8 +12,15 @@
 它们能读写这个 Bot 的数据目录（含密钥），能联网、能连局域网；没有挂载你的共享文件夹、宿主的其他目录和别的插件的数据。
 聊天或网页里的恶意指令可能诱导它把数据发出去或删掉。
 
-私聊发 `!approvals manual` 让命中危险规则的命令先问你，`!approvals smart` 恢复默认。
-如果这个会话开过 YOLO，需先发 `!yolo` 并确认回复是关闭，否则 `manual` 不会拦。
+命中上游危险规则的命令（递归删除、写系统配置、管道进 shell、容器生命周期等，按上游 `tools/approval.py` 的
+分类）先经上游审批层把关。初始配置显式写 `approvals.mode: smart`：辅助模型逐条评估，明显安全的自动放行，
+明确破坏性的自动拒绝，拿不准或守卫模型不可用的升级成人工审批，在发起它的聊天里出现，回答 yes/approve 或
+no/deny 后才执行；300 秒没人回答按拒绝处理（上游 fail-closed）。要每条命中危险规则的命令都人工放行，私聊发
+`!approvals manual`，`!approvals smart` 改回默认；这个切换和 `!yolo` 只有管理员名单里的人能改（初始配置把
+`platforms.matrix.allow_admin_from` 写成核心注入名单的占位符，init 服务在容器创建时取名单第一个 ID——归属人
+——写入，家人加进听名单也不会成为管理员）。已经装好的 Bot 配置不会被改写，重建容器时 init 会补上名单；
+没有名单的老 Bot 门禁不生效，要收紧就重装或在 config.yaml 的 `platforms.matrix` 下手动加 `allow_admin_from`。
+经 Wonton MCP 的操作（装卸插件等）不走这里，确认卡片出现在发起的聊天里。
 
 ## 初始配置
 

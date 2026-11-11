@@ -1,4 +1,4 @@
-# 每次创建容器时把数据目录里的 config.yaml 修到和注入值一致（Hermes 自己也会改写它，这里只动核心管的两处）。
+# 每次创建容器时把数据目录里的 config.yaml 修到和注入值一致（Hermes 自己也会改写它，这里只动核心管的三处）。
 #
 # 1) gateway.trust_env：Matrix 适配器 v0.22.5–v0.22.7 解析代理时不传目标主机，NO_PROXY 不生效；继承
 #    HTTPS_PROXY 会把内部的 matrix.wonton.internal 发给出口代理而被 403 拒绝，所以关闭网关的环境代理。
@@ -6,6 +6,7 @@
 #    enabled 字段就是启用）；都是空字符串（没接上网关）时标成 disabled，模型设置里不再显示这个不可用的
 #    provider，模型要用户自己在设置里配；网关装好后核心重建容器，这里再把它启用回来。用户自己加的 provider
 #    不动。enabled 字段是 Hermes 认的（hermes_cli.config_providers.is_provider_enabled）。
+# 3) platforms.matrix.allow_admin_from：见下面第 3 块——占位符在这里换成注入值。
 # 已经装好的 Bot 也要有这些项，所以不写进包里的 config.yaml。`hermes config set` 在这里用不了：它降权运行，
 # 而这时数据目录还属于 root。
 import os
@@ -36,6 +37,18 @@ if isinstance(magpie, dict):
             changed = True
     elif magpie.get("enabled") is not False:
         magpie["enabled"] = False
+        changed = True
+
+# 3) platforms.matrix.allow_admin_from：Hermes 只展开模型配置里的 ${VAR}，平台 extra 不展开；把名单占位符换成
+#    注入名单的第一个 ID（第一个就是归属人），家人加进 Bot 听的名单也不会拿到斜杠命令管理员。已有 Bot 重建
+#    容器时同样修到一致。
+allowed = os.environ.get("WONTON_MATRIX_ALLOWED_USERS", "").strip().split(",")[0].strip()
+platforms = config.get("platforms")
+matrix = platforms.get("matrix") if isinstance(platforms, dict) else None
+if isinstance(matrix, dict):
+    admins = matrix.get("allow_admin_from")
+    if isinstance(admins, str) and "${WONTON_MATRIX_ALLOWED_USERS}" in admins and allowed:
+        matrix["allow_admin_from"] = allowed
         changed = True
 
 if changed:
