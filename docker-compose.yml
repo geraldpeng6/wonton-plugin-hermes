@@ -147,7 +147,7 @@ configs:
 x-wonton:
   spec: "0.9"
   id: com.nousresearch.hermes
-  version: 0.6.5
+  version: 0.6.6
   kind: agent
   title: { zh: Hermes, en: Hermes }
   description:
@@ -173,8 +173,8 @@ x-wonton:
 
       Open the plugin page to configure Telegram, Feishu or WeCom for the default bot in Hermes' native Channels page. Telegram uses Wonton's outbound proxy.
   release_notes:
-    zh: 改用新的名单变量，Bot 只听名单里的人（核心 0.9 起，不再兼容旧变量）。需要插件规范 0.9。
-    en: Switches to the new allow-list variable so a bot follows the people on the list (core 0.9 and later; the old variable is gone). Requires spec 0.9.
+    zh: 没有模型时的提示按说话人自己的语言回一条，入口名照 App 里的「应用 → 模型设置」；清单补 owner.identity 权限读家人的语言。
+    en: The no-model hint now answers in the speaker's own language, naming the Apps → Models entry as the app shows it; the manifest adds the owner.identity permission to read family members' languages.
   agent:
     protocol: matrix
   bot:
