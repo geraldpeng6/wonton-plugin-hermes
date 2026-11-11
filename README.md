@@ -429,6 +429,13 @@ README 的图标一节只留一句来源和商标说明，指向 `NOTICE`，不�
 不动已有的 `.wonton`。插件自己的探测写在 `scripts/smoke-probes.sh`（模板带示例），没写探测的项 FAIL 并给出写法。
 要用出口代理时设 `WONTON_DEV_EGRESS_PROXY=http://…`，不设就不配。
 
+`tests/` 是钩子的行为测试：本地起一个假核心，模型的列表和按人回语言的 MCP 工具都是真的 HTTP 请求。装好依赖再跑：
+
+```bash
+uv venv .venv-test && uv pip install --python .venv-test/bin/python httpx
+.venv-test/bin/python -m unittest discover -s tests
+```
+
 开发环境和正式安装用同一份 compose（核心、身份提供方 Ory Hydra、Matrix 服务器 Tuwunel），只是项目名、核心的容器名
 和实例名不同；核心起来后同样预装模型网关 magpie（`ai.usemagpie.magpie`）。第一次 `up` 时定下设置，写在 `.wonton/.env`：
 
