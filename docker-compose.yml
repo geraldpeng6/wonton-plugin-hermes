@@ -151,10 +151,10 @@ x-wonton:
   id: com.nousresearch.hermes
   version: 0.6.7
   kind: agent
-  title: { zh: Hermes, en: Hermes }
+  title: { zh: AI 管家（Hermes）, en: All-Purpose Bot (Hermes) }
   description:
-    zh: 默认 Agent：以 Matrix bot 身份和你对话，模型走模型网关或你自己的服务商
-    en: Default agent that chats as a Matrix bot, using the model gateway or your own provider
+    zh: 像住在家里的万能管家：在 App 里和它私聊，它能上网查资料、用你装的应用提供的工具、读你允许它看的文件夹。云吞默认就带它，也能接到 Telegram、飞书、企业微信上聊。
+    en: "Like an all-round butler at home: chat with it privately in the app and it searches the web, uses the tools your apps provide and reads the folders you allow. It comes with Wonton by default and can also chat with you on Telegram, Feishu or WeCom."
   icon: icon.png
   notices: [NOTICE]
   author: { name: geraldpeng6 }
@@ -163,13 +163,13 @@ x-wonton:
   tags: { zh: [AI], en: [AI] }
   about:
     zh: |
-      Nous Research 的 Hermes Agent：在 App 里和它私聊，它能联网搜索、用你装的插件提供的工具、读你授权的文件夹。
+      Nous Research 家的通用 AI 助手：在 App 里和它私聊，它能上网查资料、用你装的应用提供的工具、读你允许它看的文件夹。
 
       消息走加密的 Matrix 私聊。模型默认走模型网关，不用自己填 key；没接网关时在“模型设置”里加自己的模型服务商和 key 也能用，它会按你的语言提醒你怎么配。经云吞装卸插件这类操作要你在卡片上确认；Hermes 自带的终端、文件和浏览器工具在它自己的容器里直接运行，能读写这个 Bot 的数据（含密钥）、能联网，碰不到你的共享文件夹和别的插件的数据。
 
       打开插件网页，在 Hermes 原生 Channels 页配置默认 Bot 的 Telegram、飞书或企业微信渠道。Telegram 使用云吞的出网代理。
     en: |
-      Hermes Agent by Nous Research: chat with it in the app. It can search the web, use the tools your plugins provide and read the folders you allow.
+      An all-round AI assistant by Nous Research: chat with it privately in the app, and it can search the web, use the tools your apps provide and read the folders you allow.
 
       Messages travel in an encrypted Matrix chat. The model goes through the model gateway by default, so there is no key to fill in; without a gateway, add your own provider and key in Model settings and it will guide you there in your language. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and reach the network, but not your shared folders or other plugins' data.
 
