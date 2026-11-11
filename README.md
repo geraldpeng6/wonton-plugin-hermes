@@ -170,11 +170,11 @@ docker buildx imagetools inspect nginx:1.30.6-alpine
   `{user}`、`{name}`（显示名）、`{email}` 和 `{secret:<名字>}`（插件密钥里由核心生成、至少 16 字节的一项，见第 8 步），
   其余文字原样保留；Cookie 的值只能用 `{secret:…}` 和固定文字。网关先删掉客户端发来的同名请求头和 Cookie，再注入凭据。
   用请求头认人的应用只信任 `${WONTON_CORE_ADDRESS}/32`，不能信任整个网段。请求头和 Cookie 限制、可信代理条件见规范的
-  [网关代登录](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#网关代登录sso-proxy)。
+  [网关代登录](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#网关代登录sso-proxy)。
 - `none`（默认）：网关只校验登录，应用保留自己的登录，或者本来就不需要登录。新插件默认这样：装好后第一次打开，主人在应用里
   自己注册管理员。插件网页仍然在网关的登录后面，只有主人打得开注册页面。
 
-SSO 的接入条件见规范的[网页入口与单点登录](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#网页入口与单点登录)：
+SSO 的接入条件见规范的[网页入口与单点登录](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#网页入口与单点登录)：
 不能依赖脚本预建账号、改应用数据或每次启动核对，做不到就用 `none`。身份变量的授权另见第 7 步。
 
 ### 4. 数据
@@ -219,9 +219,9 @@ services:
 
   宿主端口和容器端口相同，不做映射；`protocol` 是 `tcp`（默认）或 `udp`。`lan` 和 `network.lan` 必须同时声明。
   不能列 `mcp` 的 TCP 端口；`webui` 的端口可以列入，由主人决定是否开放。`lan_webui` 开关及风险、其他限制和地址规则见规范的
-  [局域网](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#局域网networklan)。
+  [局域网](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#局域网networklan)。
 - 插件网络不是信任边界，不能据此信任身份头。核心服务的地址以注入变量为准，不要自己拼；网络隔离和代理可达性见规范的
-  [网络](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#网络)。
+  [网络](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#网络)。
 
 ### 6. 权限
 
@@ -275,7 +275,7 @@ services:
 
 - v0.3 引用主人身份变量要申请 `owner.identity`，不能只靠 `oidc` 或 `proxy`；低于 v0.3 的旧清单保留 SSO 兼容注入。
   `sso: none` 也能申请，不要为拿变量开启 SSO。登录时从 OIDC 或代登录模板拿到的身份不受此权限控制，完整规则见规范的
-  [安装时注入的变量](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#安装时注入的变量)。
+  [安装时注入的变量](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#安装时注入的变量)。
 - 主人身份以注入值为准：用户名用 `${WONTON_OWNER_NAME:?需要主人用户名}`，不写死 `owner`，也不按规则拼邮箱。
   邮箱必需时用 `${WONTON_OWNER_EMAIL:?需要主人邮箱}`，可选时用 `${WONTON_OWNER_EMAIL:-}`。
 - 用户名装好后不变，应用按用户名或 OIDC 的 `sub` 认人，不按邮箱认；有数据的账号绝不删除。已有账号资料由主人在应用内修改，
@@ -300,7 +300,7 @@ configs:
 - 顶层 `configs` 只支持 `file`（包里的文件）和 `content`（内联的文本，按注入的变量插值）。
 - 核心在创建容器以后、启动以前把文件写进容器，每次创建容器都重新写。`uid`、`gid`、`mode` 对 `file` 也生效，`mode`
   默认 `0444`；属主和 `mode` 的规则见规范的
-  [配置文件](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#配置文件configs)。`target` 是容器里的绝对路径，
+  [配置文件](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#配置文件configs)。`target` 是容器里的绝对路径，
   不能落在这个服务的挂载点里，`read_only: true` 的服务不能用 `configs`。
 - 应用自己会改写的配置，由一个一次性服务在首次启动前复制进数据目录、已经有了就不覆盖：
 
@@ -354,7 +354,7 @@ x-wonton:
 
 | 字段 | 说明 |
 | --- | --- |
-| `icon` | 包里的 PNG 或 SVG；规则见规范的[图标和截图](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#图标和截图)及[图标用什么](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#图标用什么) |
+| `icon` | 包里的 PNG 或 SVG；规则见规范的[图标和截图](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#图标和截图)及[图标用什么](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#图标用什么) |
 | `screenshots` | 仓库里 1 到 6 张 PNG 或 JPEG，每张不超过 1 MiB，长边建议至少 1280，横屏竖屏不要混着用。不算插件包 |
 | `category` | `ai`、`agent`、`photos`、`media`、`files`、`documents`、`productivity`、`communication`、`home`、`network`、`security`、`developer`、`downloads`、`tools` 之一；`system` 只给系统插件 |
 | `author` | 插件包的作者：`name`，可选 `url`（HTTPS） |
@@ -401,7 +401,7 @@ README 的图标一节只留一句来源和商标说明，指向 `NOTICE`，不�
   共享文件夹的 `uri` 是 `wonton-share:<共享文件夹>/<相对路径>`（第一段是共享文件夹名，不是容器里的挂载点），路径按 URI
   规则做百分号编码；插件自己的文件用 MCP 资源。不超过 1 MiB 的小图可以先用 `image` 块给 Agent 看一眼，要分享原图再附一个
   引用；`blob` 适合小文件，大文件不要塞进去。其余（`_meta`、路径和数量上限）见规范的
-  [工具结果里的文件](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#提供工具mcp)。
+  [工具结果里的文件](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#提供工具mcp)。
 
 这几项的细节（多 Bot 的写法、模型凭据、工具命名和权限）见插件规范的对应章节。
 
@@ -535,5 +535,5 @@ scripts/check.sh
 
 ## 规则以哪里为准
 
-这里是[插件规范](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md) `x-wonton` 的写插件指南，完整规则和理由在规范里。
+这里是[插件规范](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md) `x-wonton` 的写插件指南，完整规则和理由在规范里。
 规范和核心一起演进；说法对不上时以核心的检查为准：`scripts/check.sh` 通过、`scripts/dev.sh install` 装得上，插件包才算写对了。
