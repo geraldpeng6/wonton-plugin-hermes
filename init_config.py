@@ -10,7 +10,8 @@
 # 3) platforms.matrix.allow_admin_from：见下面第 3 块——占位符在这里换成注入值。
 # 4) approvals.smart_policy：包里 config.yaml 定的守卫默认规则，已有 Bot 的配置缺这项或留空时补上，
 #    主人自己写过的不动。
-# 已经装好的 Bot 也要有这些项，所以不写进包里的 config.yaml。`hermes config set` 在这里用不了：它降权运行，
+# 前三处注入值不写进包里的 config.yaml：已装好的 Bot 也要修到一致，只有 init 每次创建容器时能补（第 4 处
+# 的守卫默认值相反，就存在包里的 config.yaml，init 从那里取）。`hermes config set` 在这里用不了：它降权运行，
 # 而这时数据目录还属于 root。
 import os
 
