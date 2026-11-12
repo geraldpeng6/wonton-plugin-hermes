@@ -17,12 +17,13 @@
 #                                             以用户的身份请求插件网页；--sso 会从清单 webui.path 的入口提交 JS 自动表单并跟完重定向
 #   scripts/dev.sh api <方法> <路径> [<curl 参数>…] 带用户令牌调用核心管理接口
 #   scripts/dev.sh egress <地址>                读取设置后用同样的 restarts 和直连网段设置出口代理
+#   scripts/dev.sh model <上游地址> <模型> <key 文件>  把 OpenAI 兼容的服务商接成模型网关的上游（key 只从文件读）
 #   scripts/dev.sh mcp list                   Bot 经 MCP 总线能调到的工具（JSON）
 #   scripts/dev.sh mcp call <工具> [<JSON>]   经 MCP 总线调用工具，参数是 JSON 对象，默认 {}
 #   scripts/dev.sh mcp --direct list|call …   直连工作区清单的 MCP 服务，只调试插件本身，不走总线权限和确认
 #   scripts/dev.sh approve [--watch]          用主人令牌批准确认卡片；--watch 持续批准，Ctrl-C 停止
-#   scripts/dev.sh smoke                      对工作区的插件跑合并前的端到端冒烟：起一套一次性实例，跑完清理
-#   scripts/dev.sh probes [<探针名>…]          对装着的工作区插件跑冒烟探针（web_assert、identity_check、mcp、data_write、data_check），不起新实例；给了名字就只跑那几项
+#   scripts/dev.sh smoke                      对工作区的插件跑合并前的端到端冒烟：起一套一次性实例，跑完清理（参数见 smoke.sh 开头）
+#   scripts/dev.sh probes [<探针名>…]          对装着的工作区插件跑冒烟探针（web_assert、identity_check、mcp、extra_check、data_write、data_check），不起新实例；给了名字就只跑那几项
 #   scripts/dev.sh pair                       在终端里出配对二维码，给 App 用
 #   scripts/dev.sh down                       停下核心，数据都留着；插件的容器由核心管，照常运行
 #   scripts/dev.sh reset                      删掉当前实例的插件容器和网络，保留核心和 .wonton 数据
@@ -37,6 +38,7 @@
 # 默认地址池（只有约 30 个网络，几套栈共用一台 Docker 时会用光）；写进 .wonton/compose.subnet.yaml，栈拆掉之前一直沿用。
 # WONTON_DEV_STATE（如 ~/.w/<插件名>）把 .wonton 整个换到别处，每次执行都要带上：宿主网络插件的中继套接字在
 # <它>/data/apps/<插件 id>/relay/webui.sock，unix 套接字路径最多 107 字节，仓库放得深时核心会拒装。
+# 一个仓库放多家插件：WONTON_PLUGIN 指到插件目录（如 WONTON_PLUGIN=agents/<名>），状态放在 .wonton/<目录名>。
 set -euo pipefail
 # forget_environment 会清掉所有 WONTON_*，先留一份。
 core_subnet="${WONTON_DEV_CORE_SUBNET:-}"
@@ -85,7 +87,7 @@ first_settings() {
   instance="${WONTON_INSTANCE:-}"
   if [[ -z "$instance" ]]; then
     local base
-    base="$(basename "$root")"
+    base="$(basename "$plugin")"
     base="${base#wonton-plugin-}"
     base="$(printf '%s' "${base#wonton-}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9' | cut -c1-10)"
     instance="${base:-dev}$(random_hex 2)"
@@ -102,7 +104,7 @@ first_settings() {
   source="${WONTON_CORE_IMAGE:-$default_image}"
   pull="${WONTON_PULL:-}"
   domain="${WONTON_DEV_DOMAIN:-$instance.wonton.localhost}"
-  owner_email="${WONTON_OWNER_EMAIL:-owner@$domain}"
+  owner_email="${WONTON_OWNER_EMAIL:-$default_owner_email}"
 }
 
 # 核心的基础域名，不是实例名：实例名只是资源名前缀。别的栈写 .wonton/.env 的 WONTON_BASE_DOMAIN；从主仓库抄成
@@ -117,7 +119,7 @@ load_settings() {
   source="$(setting WONTON_CORE_SOURCE)"
   pull="${WONTON_PULL:-$(setting WONTON_PULL)}"
   owner_email="$(setting WONTON_OWNER_EMAIL)"
-  [[ -n "$owner_email" ]] || owner_email="owner@$domain"
+  [[ -n "$owner_email" ]] || owner_email="$default_owner_email"
 }
 
 write_settings() {
@@ -311,7 +313,7 @@ PY
 }
 
 install_plugin() {
-  local yes="" ref="" dir="$root" arg preview grants result answer
+  local yes="" ref="" dir="$plugin" arg preview grants result answer
   for arg in "$@"; do
     case "$arg" in
       --yes) yes=1 ;;
@@ -320,12 +322,13 @@ install_plugin() {
     esac
   done
   need_env
+  need_plugin
   # 放在 .wonton/ 里：Docker Desktop 一定能挂载仓库下面的目录。退出时才删，所以 tmp 不是局部变量。
   tmp="$(mktemp -d "$state/tmp.XXXXXX")"
   trap 'rm -rf "$tmp"' EXIT
   if [[ -n "$ref" ]]; then
     mkdir "$tmp/src"
-    git -C "$root" archive "$ref" | tar -x -C "$tmp/src" || die "导不出 $ref（git archive 失败）"
+    git -C "$root" archive "$(plugin_tree "$ref")" | tar -x -C "$tmp/src" || die "导不出 $(plugin_tree "$ref")（git archive 失败）"
     dir="$tmp/src"
   fi
   in_core "$dir" plugin pack /plugin >"$tmp/package.tar" || die "打包失败，原因见上面"
@@ -380,7 +383,7 @@ reinstall() {
 # 升级已装的插件：走核心的升级接口，数据和 Bot 的 Matrix 设备都保留（reinstall 是卸载再装，会吊销 Bot 设备，
 # Bot 就读不到旧房间的加密历史了）。
 upgrade() {
-  local yes="" ref="" dir="$root" arg id preview grants result answer
+  local yes="" ref="" dir="$plugin" arg id preview grants result answer
   for arg in "$@"; do
     case "$arg" in
       --yes) yes=1 ;;
@@ -389,13 +392,14 @@ upgrade() {
     esac
   done
   need_env
+  need_plugin
   id="$(plugin_id)"
   # 放在 .wonton/ 里：Docker Desktop 一定能挂载仓库下面的目录。退出时才删，所以 tmp 不是局部变量。
   tmp="$(mktemp -d "$state/tmp.XXXXXX")"
   trap 'rm -rf "$tmp"' EXIT
   if [[ -n "$ref" ]]; then
     mkdir "$tmp/src"
-    git -C "$root" archive "$ref" | tar -x -C "$tmp/src" || die "导不出 $ref（git archive 失败）"
+    git -C "$root" archive "$(plugin_tree "$ref")" | tar -x -C "$tmp/src" || die "导不出 $(plugin_tree "$ref")（git archive 失败）"
     dir="$tmp/src"
   fi
   in_core "$dir" plugin pack /plugin >"$tmp/package.tar" || die "打包失败，原因见上面"
@@ -517,13 +521,13 @@ sso_form_login() {
     page_file="$(mktemp)"
     if [[ "$method" == GET ]]; then
       effective="$(curl_t "$SMOKE_WEB_MAX_TIME" "$request_url" --noproxy '*' -L -b "$jar" -c "$jar" \
-        -H 'Accept: text/html' -o "$page_file" -w '%{url_effective}')" || {
+        -H "Accept: $browser_accept" -o "$page_file" -w '%{url_effective}')" || {
         rm -f "$page_file"
         die "读取 SSO 页面失败（$request_url）"
       }
     else
       effective="$(curl_t "$SMOKE_WEB_MAX_TIME" "$request_url" --noproxy '*' -L -b "$jar" -c "$jar" \
-        -H 'Accept: text/html' -o "$page_file" -w '%{url_effective}' \
+        -H "Accept: $browser_accept" -o "$page_file" -w '%{url_effective}' \
         --data "$data")" || {
         rm -f "$page_file"
         die "提交 SSO 表单失败（$request_url）"
@@ -597,7 +601,7 @@ session_into() {
   if [[ -n "$sso" ]]; then
     sso_form_login "$jar" "$entry"
   else
-    curl_t "$SMOKE_WEB_MAX_TIME" "$entry" --noproxy '*' -o /dev/null -L -b "$jar" -c "$jar" -H 'Accept: text/html' ||
+    curl_t "$SMOKE_WEB_MAX_TIME" "$entry" --noproxy '*' -o /dev/null -L -b "$jar" -c "$jar" -H "Accept: $browser_accept" ||
       die "走不通插件网页的登录跳转（GET $entry）"
   fi
 }
@@ -637,6 +641,8 @@ web() {
 if [[ "${1:-}" != kit-update ]]; then
   # shellcheck source=scripts/dev-mcp.sh
   . "$root/scripts/dev-mcp.sh"
+  # shellcheck source=scripts/dev-model.sh
+  . "$root/scripts/dev-model.sh"
 fi
 
 mcp() {
@@ -822,10 +828,11 @@ case "${1:-}" in
   web) web "${@:2}" ;;
   api) api_command "${@:2}" ;;
   egress) egress_proxy "${@:2}" ;;
+  model) model_upstream "${@:2}" ;;
   session) session "${@:2}" ;;
   mcp) mcp "${@:2}" ;;
   approve) approve "${@:2}" ;;
-  smoke) "$root/scripts/smoke.sh" "${@:2}" ;;
+  smoke) WONTON_PLUGIN="$plugin_rel" "$root/scripts/smoke.sh" "${@:2}" ;;
   probes)
     # 探针套件在这里才 source：里面有的名字（如 mcp）会盖过本文件的函数，probes 自己的路不受影响。
     # shellcheck source=scripts/probes.sh
