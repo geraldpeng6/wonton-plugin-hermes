@@ -50,6 +50,8 @@ services:
         target: /seed/wonton/__init__.py
       - source: wonton_side_chat
         target: /seed/wonton/side_chat.py
+      - source: wonton_message_batch
+        target: /seed/wonton/message_batch.py
       - source: wonton_texts
         target: /seed/wonton/texts.py
       - source: wonton_locale
@@ -164,6 +166,8 @@ configs:
     file: ./wonton/__init__.py
   wonton_side_chat:
     file: ./wonton/side_chat.py
+  wonton_message_batch:
+    file: ./wonton/message_batch.py
   wonton_texts:
     file: ./wonton/texts.py
   wonton_locale:
@@ -208,8 +212,8 @@ x-wonton:
 
       CN office-IM channels (Feishu, DingTalk, WeCom, QQ bot, personal WeChat) are enabled one by one in the plugin's settings: create a bot app on the platform's console, fill in the app ID and secret, and turn the switch on. These chats live only in that IM, not in the Wonton app's chat page; personal WeChat supports direct messages only and needs a one-time scan login from a terminal on the server (steps in the plugin README). Telegram is still configured in Hermes' native Channels page and uses Wonton's outbound proxy.
   release_notes:
-    zh: "兼容性修复：插件设置的引用改成带空默认值的写法，官方索引的校验脚本不再报错；渠道功能没有变化。"
-    en: "Compatibility fix: plugin-settings references now carry empty fallbacks so the official index validation passes; channel behavior is unchanged."
+    zh: "在 App 里一次发几张照片加一句话，AI 把它们收齐了再一起处理：照片都在这一轮里，回答不再一张一张地冒出来；一组里有没传到的，等两分钟按收到的先答，并告诉你少了几条。"
+    en: "Photos and a message sent together in the app now arrive as one turn: the photos are all part of that round instead of one-by-one replies; when part of a batch is missing, it waits two minutes, answers with what arrived and tells you how many were missing."
   agent:
     protocol: matrix
   bot:
