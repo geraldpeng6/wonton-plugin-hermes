@@ -20,7 +20,7 @@ NO_DEFAULT = {
     "ja": "既定のモデル {model} に使えるモデルがありません。アプリ → Models で、ルーティンググループ {group} を確認してください。",
 }
 
-# 旁聊结果行的 body（ADR-0093 §1 的样例：旁聊「标题」：已完成）。state 用英文码进结构化字段，
+# 旁聊结果行的 body（旁聊约定的样例：旁聊「标题」：已完成）。state 用英文码进结构化字段，
 # body 里的说法用主人的语言。
 SIDE_CHAT_BODY = {
     "en": "Side chat 「{title}」: {state}",
