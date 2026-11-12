@@ -4,7 +4,7 @@
 权限。一个插件一个 Git 仓库，仓库根目录就是插件包，发布就是打 tag。主人在 App 里装上插件，核心按清单起容器、接好登录，
 插件的网页在 App 里作为小程序打开。
 
-这个仓库是 Hermes 插件：云吞的默认 Agent，以 Matrix bot 身份和主人对话，模型经模型网关。插件网页打开默认 Bot 的原生 Channels 页，由主人填写 Telegram、飞书、企业微信的凭据和白名单。怎么写插件、怎么用开发环境，见下面的说明（从模板仓库带来）。
+这个仓库是 Hermes 插件：云吞的默认 Agent，以 Matrix bot 身份和主人对话，模型经模型网关。飞书、钉钉、企业微信、QQ、个人微信这些国内 IM 渠道在插件详情页的「设置」里逐个启用（见下面的「国内 IM 渠道」）；Telegram 在插件网页的原生 Channels 页填凭据和白名单。怎么写插件、怎么用开发环境，见下面的说明（从模板仓库带来）。
 
 ## 工具与确认的边界
 
@@ -57,7 +57,39 @@ Hermes 的回环 dashboard 把临时 token 注入 HTML，原生前端通过 `X-H
 
 Channels 保存凭据到该 Bot 的 `.env`；“Restart to apply” 调用 `hermes -p default gateway restart --interrupt`，由原生 s6 替换 gateway 进程，dashboard 和容器继续运行。当前对话可能被中断，Matrix 由 gateway 重连。按钮返回成功只代表已启动重启命令，验证还需核对 action 的退出码、gateway 新 PID 和渠道状态。
 
-Telegram 显式使用核心注入的 `WONTON_PROXY_URL`；未配代理时为空，走直连。渠道凭据和白名单留在 Hermes 原生页面，不增加插件设置字段。没有真实 IM 凭据时只能验证错误反馈，不能据此声称真实渠道已连通。
+Telegram 显式使用核心注入的 `WONTON_PROXY_URL`；未配代理时为空，走直连。Telegram 的凭据和白名单留在 Hermes 原生页面，不增加插件设置字段。没有真实 IM 凭据时只能验证错误反馈，不能据此声称真实渠道已连通。
+
+## 国内 IM 渠道
+
+飞书、钉钉、企业微信（智能机器人）、QQ（官方机器人）、个人微信五个渠道，每个渠道在插件详情页的「设置」里一个开关，
+默认关。应用 ID 填在设置里，对应的密钥（App Secret）填在「插件密钥」里，都选填：没填的渠道不启用、不报错；开关关着
+的渠道即使留着凭据也不启用。开关和凭据保存后 Bot 容器会重建一次，对话短暂中断。填了假凭据时 Hermes 会在日志里报该
+渠道的鉴权错误并不断重试，网关和其他渠道照常。
+
+这些渠道的聊天只出现在对应的 IM 里，不进云吞 App 的聊天页，也不会有加密同步；群聊行为按各平台上游默认。每个渠道
+去哪里建机器人：
+
+| 渠道 | 建机器人的地方 | 连接方式 |
+| --- | --- | --- |
+| 飞书 | [飞书开放平台](https://open.feishu.cn/) 建应用，开启机器人能力，订阅 `im.message.receive_v1`，发布版本 | 长连接（WebSocket），无需公网 |
+| 钉钉 | [钉钉开发者后台](https://open-dev.dingtalk.com/) 建应用，机器人能力选「Stream 模式」 | Stream 长连接，无需公网 |
+| 企业微信 | [管理后台](https://work.weixin.qq.com/) 建一个「智能机器人」 | 官方 WebSocket 网关，无需公网 |
+| QQ | [q.qq.com](https://q.qq.com/) 注册机器人，打开消息意图 | 官方 WebSocket，无需公网 |
+| 个人微信 | 不建应用：用微信扫码登录腾讯官方 iLink 通道 | 扫码登录 + 长轮询，无需公网；只支持私聊 |
+
+个人微信的扫码登录不在网页上：二维码由 Hermes 的配置向导画在终端里。在部署云吞的服务器上找到 Hermes 网关容器
+（`docker ps` 里名字带 `hermes` 的 gateway 容器），运行：
+
+```bash
+docker exec -it <gateway 容器名> hermes gateway setup
+```
+
+选 Weixin / WeChat，用微信扫码并确认；账号和令牌会写进该 Bot 数据目录的 `.env`。然后回到插件设置打开「个人微信」
+开关（不用填任何值），容器重建后即用扫码得到的身份收发。只支持私聊：iLink 连接的是一个独立的机器人身份，普通
+微信群通常拉不进它，群聊事件也不送达。两边都配过凭据时，以 Hermes 原生 Channels 页/终端向导写进 `.env` 的为准
+（Hermes 的 `.env` 覆盖同名环境变量）。
+
+首次启用飞书或钉钉渠道时，Hermes 会现装对应的官方 SDK（访问 PyPI），装完自动连接；其他三个渠道的依赖已在镜像里。
 
 ## 准备
 
@@ -137,7 +169,8 @@ x-wonton:
 - `permissions` 必填，不要权限时写空列表。
 - `requirements` 可选：`arch`（如 `[amd64, arm64]`，和主人的服务器架构不符时装不上）、`memory`（如 `2G`）、
   `gpu`（`required`（默认）或 `optional`，还要申请 `devices.gpu` 并写 `gpu.services`，见第 6 步）。
-- 插件的设置做在插件自己的网页里。清单的 `settings`（给 App 渲染原生表单的 JSON Schema）是预留的。
+- 插件的设置写清单的 `settings`：指向包里的 JSON Schema，App 渲染原生设置页，值以 `WONTON_SETTING_<属性名大写>`
+  注入 compose；凭据类（密钥）不放设置，写在 `secrets` 的 `input` 里，以 `WONTON_SECRET_<名字>` 注入。
 - 清单里有未知字段时装不上：拼错的字段不会被悄悄忽略。
 
 ### 2. 服务

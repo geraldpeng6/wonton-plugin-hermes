@@ -32,6 +32,13 @@ services:
       WONTON_MODEL_DEFAULT: ${WONTON_MODEL_DEFAULT}
       # 平台 extra 里的 allow_admin_from 占位符由 init 换成这个值（Hermes 不展开 extra 的 ${VAR}）。
       WONTON_MATRIX_ALLOWED_USERS: ${WONTON_MATRIX_ALLOWED_USERS:?需要主人的 Matrix 用户 ID}
+      # 国内 IM 渠道开关（插件设置，true/false）：init 据此在 config.yaml 里写或撤显式停用（见 init_config.py）。
+      # 开关值单独注入是为了改开关时重建 init + gateway 容器，停用状态跟着走。
+      FEISHU_WONTON_ENABLED: ${WONTON_SETTING_FEISHU_ENABLED}
+      DINGTALK_WONTON_ENABLED: ${WONTON_SETTING_DINGTALK_ENABLED}
+      WECOM_WONTON_ENABLED: ${WONTON_SETTING_WECOM_ENABLED}
+      QQ_WONTON_ENABLED: ${WONTON_SETTING_QQ_ENABLED}
+      WEIXIN_WONTON_ENABLED: ${WONTON_SETTING_WEIXIN_ENABLED}
     volumes:
       - ${WONTON_BOT_DATA}:/opt/data
     configs:
@@ -72,6 +79,23 @@ services:
       HERMES_DASHBOARD_PORT: "9119"
       # gateway.trust_env 已关闭；Telegram 单独使用核心的出口代理，未配代理时为空。
       TELEGRAM_PROXY: ${WONTON_PROXY_URL}
+      # 国内 IM 渠道：凭据来自插件设置（App ID）和插件密钥（Secret），空串表示没配，Hermes 不启用该渠道、不报错。
+      # 变量名是 Hermes 认的（各平台 gateway_env 桥接，见上游文档）；飞书固定走 WebSocket 长连接，钉钉走 Stream，
+      # 企业微信走智能机器人的 WebSocket，QQ 走官方 WebSocket，个人微信凭据只能扫码取得（见 README）。
+      # 开关单独注入：改开关会重建容器，init 随之在 config.yaml 里写/撤显式停用，关着的渠道即使留着凭据也不启用。
+      FEISHU_APP_ID: ${WONTON_SETTING_FEISHU_APP_ID}
+      FEISHU_APP_SECRET: ${WONTON_SECRET_FEISHU_APP_SECRET}
+      FEISHU_WONTON_ENABLED: ${WONTON_SETTING_FEISHU_ENABLED}
+      DINGTALK_CLIENT_ID: ${WONTON_SETTING_DINGTALK_CLIENT_ID}
+      DINGTALK_CLIENT_SECRET: ${WONTON_SECRET_DINGTALK_CLIENT_SECRET}
+      DINGTALK_WONTON_ENABLED: ${WONTON_SETTING_DINGTALK_ENABLED}
+      WECOM_BOT_ID: ${WONTON_SETTING_WECOM_BOT_ID}
+      WECOM_SECRET: ${WONTON_SECRET_WECOM_SECRET}
+      WECOM_WONTON_ENABLED: ${WONTON_SETTING_WECOM_ENABLED}
+      QQ_APP_ID: ${WONTON_SETTING_QQ_APP_ID}
+      QQ_CLIENT_SECRET: ${WONTON_SECRET_QQ_CLIENT_SECRET}
+      QQ_WONTON_ENABLED: ${WONTON_SETTING_QQ_ENABLED}
+      WEIXIN_WONTON_ENABLED: ${WONTON_SETTING_WEIXIN_ENABLED}
       # matrix.bot：核心代这个 Bot 登录后签发的身份，只给令牌，不给密码。
       MATRIX_HOMESERVER: ${WONTON_MATRIX_HOMESERVER}
       MATRIX_USER_ID: ${WONTON_MATRIX_USER_ID}
@@ -151,16 +175,17 @@ configs:
     file: ./dashboard-nginx.conf
 
 x-wonton:
-  spec: "0.9"
+  spec: "0.12"
   id: com.nousresearch.hermes
-  version: 0.6.8
+  version: 0.7.0
   kind: agent
   title: { zh: AI 管家（Hermes）, en: All-Purpose Bot (Hermes) }
   description:
-    zh: 像住在家里的万能管家：在 App 里和它私聊，它能上网查资料、用你装的应用提供的工具、读你允许它看的文件夹。云吞默认就带它，也能接到 Telegram、飞书、企业微信上聊。
-    en: "Like an all-round butler at home: chat with it privately in the app and it searches the web, uses the tools your apps provide and reads the folders you allow. It comes with Wonton by default and can also chat with you on Telegram, Feishu or WeCom."
+    zh: 像住在家里的万能管家：在 App 里和它私聊，它能上网查资料、用你装的应用提供的工具、读你允许它看的文件夹。云吞默认就带它，也能接到 Telegram、飞书、钉钉、企业微信、QQ 和个人微信上聊。
+    en: "Like an all-round butler at home: chat with it privately in the app and it searches the web, uses the tools your apps provide and reads the folders you allow. It comes with Wonton by default and can also chat with you on Telegram, Feishu, DingTalk, WeCom, QQ or personal WeChat."
   icon: icon.png
   notices: [NOTICE]
+  settings: settings.schema.json
   author: { name: geraldpeng6 }
   homepage: https://github.com/NousResearch/hermes-agent
   license: MIT
@@ -171,16 +196,19 @@ x-wonton:
 
       消息走加密的 Matrix 私聊。模型默认走模型网关，不用自己填 key；没接网关时在“模型设置”里加自己的模型服务商和 key 也能用，它会按你的语言提醒你怎么配。经云吞装卸插件这类操作要你在卡片上确认；Hermes 自带的终端、文件和浏览器工具在它自己的容器里直接运行，能读写这个 Bot 的数据（含密钥）、能联网，碰不到你的共享文件夹和别的插件的数据。
 
-      打开插件网页，在 Hermes 原生 Channels 页配置默认 Bot 的 Telegram、飞书或企业微信渠道。Telegram 使用云吞的出网代理。
+      国内办公 IM 渠道（飞书、钉钉、企业微信、QQ 机器人、个人微信）在插件详情页的「设置」里逐个启用：去对应平台的
+      开放平台建一个机器人应用，把应用 ID 和密钥填进来、打开开关。这些聊天只出现在那个 IM 里，不进云吞 App 的聊天页；
+      个人微信只支持私聊，而且要先在服务器的终端里扫码登录（步骤见插件 README）。Telegram 仍在 Hermes 原生 Channels 页
+      配置，使用云吞的出网代理。
     en: |
       An all-round AI assistant by Nous Research: chat with it privately in the app, and it can search the web, use the tools your apps provide and read the folders you allow.
 
-      Messages travel in an encrypted Matrix chat. The model goes through the model gateway by default, so there is no key to fill in; without a gateway, add your own provider and key in Model settings and it will guide you there in your language. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and reach the network, but not your shared folders or other plugins' data.
+      Messages travel in an encrypted Matrix chat. The model goes through the model gateway by default, so there is no key to fill in; without a gateway, add your own provider and key in Model settings and it will guide you there in your language. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and rea…
 
-      Open the plugin page to configure Telegram, Feishu or WeCom for the default bot in Hermes' native Channels page. Telegram uses Wonton's outbound proxy.
+      CN office-IM channels (Feishu, DingTalk, WeCom, QQ bot, personal WeChat) are enabled one by one in the plugin's settings: create a bot app on the platform's console, fill in the app ID and secret, and turn the switch on. These chats live only in that IM, not in the Wonton app's chat page; personal WeChat supports direct messages only and needs a one-time scan login from a terminal on the server (steps in the plugin README). Telegram is still configured in Hermes' native Channels page and uses Wonton's outbound proxy.
   release_notes:
-    zh: "旁聊聊完一轮，主对话里会留一行结果（完成、失败或已结束），你接着说话时它也知道旁聊里最新的进展；它正忙着干活时你再发新消息，会并进手上这一轮一起处理，不再中途一句一条往外冒；收到它打不开的文件会照实说打不开，把文件存进共享文件夹时也不再把你存的东西说成进了相册。"
-    en: "A finished side chat now leaves a one-line result in the main conversation (done, failed or ended), and the bot knows the latest side-chat updates when you talk to it next; messages you send while it is busy are folded into the turn it is working on instead of trickling out one by one; files it cannot open are reported as unreadable, and saving a file into the shared folder is no longer described as adding it to the photo library."
+    zh: "新增国内办公 IM 渠道：在插件设置里逐个启用飞书、钉钉、企业微信、QQ 机器人或个人微信，填上在各平台建应用拿到的 ID 和密钥，就能在对应 IM 里和管家私聊（群聊按各平台上游默认）；这些聊天只出现在那个 IM 里，不进云吞 App。个人微信走腾讯官方通道，先在服务器终端扫码登录再开开关，只支持私聊。没填凭据的渠道不启用、不报错。"
+    en: "New CN office-IM channels: enable Feishu, DingTalk, WeCom, the QQ bot or personal WeChat one by one in the plugin settings, fill in the app ID and secret from the platform's console, and chat with the butler in that IM (group chats follow each platform's upstream defaults); these chats appear only in that IM, not in the Wonton app. Personal WeChat uses Tencent's official channel: scan to log in from a server terminal, then flip the switch; direct messages only. Channels without credentials stay off without errors."
   agent:
     protocol: matrix
   bot:
@@ -198,6 +226,28 @@ x-wonton:
     # Hermes 只凭令牌就自动建好交叉签名，恢复密钥只写在数据目录里；交给核心保管，数据丢了还能恢复。
     matrix_recovery_key:
       collect: { service: gateway, path: /opt/data/platforms/matrix/recovery-key.txt }
+    # 国内 IM 渠道的应用密钥：主人在各平台建应用后填写，以 WONTON_SECRET_<名字> 注入（compose 里引用）。
+    # 都选填：没填的渠道不启用（对应开关也关着时更是显式停用）。
+    feishu_app_secret:
+      input:
+        title: { zh: 飞书 App Secret, en: Feishu App Secret }
+        url: https://open.feishu.cn/app
+        required: false
+    dingtalk_client_secret:
+      input:
+        title: { zh: 钉钉 Client Secret（AppSecret）, en: DingTalk Client Secret (AppSecret) }
+        url: https://open-dev.dingtalk.com/
+        required: false
+    wecom_secret:
+      input:
+        title: { zh: 企业微信机器人 Secret, en: WeCom bot Secret }
+        url: https://work.weixin.qq.com/
+        required: false
+    qq_client_secret:
+      input:
+        title: { zh: QQ 机器人 App Secret, en: QQ bot App Secret }
+        url: https://q.qq.com/
+        required: false
   permissions:
     - models
     - matrix.bot
