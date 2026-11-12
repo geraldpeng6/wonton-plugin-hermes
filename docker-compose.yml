@@ -153,7 +153,7 @@ configs:
 x-wonton:
   spec: "0.9"
   id: com.nousresearch.hermes
-  version: 0.6.7
+  version: 0.6.8
   kind: agent
   title: { zh: AI 管家（Hermes）, en: All-Purpose Bot (Hermes) }
   description:
@@ -179,8 +179,8 @@ x-wonton:
 
       Open the plugin page to configure Telegram, Feishu or WeCom for the default bot in Hermes' native Channels page. Telegram uses Wonton's outbound proxy.
   release_notes:
-    zh: "smart 审批加默认守卫规则：sudo/doas 提权、改系统配置、容器启停删、工作区外的删除一律先问主人，其余由辅助模型照常评估；!approvals 和 !yolo 只有主人能改，已装的 Bot 重建容器时自动补上守卫规则。每轮对话带上云吞引导：应用的事用应用的工具、身份已带好不用问用户要令牌、调不通就如实说，上游的 Obsidian 笔记技能默认关掉（它会把笔记存进主人看不到的本地库），已装的 Bot 重建容器时自动生效。"
-    en: "Smart approvals gain a default guard policy: privilege escalation (sudo/doas), system configuration changes, container lifecycle and deletions outside the workspace always ask the owner first, everything else is still triaged by the auxiliary model; !approvals and !yolo stay owner-only, and existing bots pick up the guard policy when their containers are recreated. Every turn now carries Wonton guidance: use the app's own tools for app work, credentials are provided so never ask the user for tokens, report failures honestly instead of saving elsewhere; the upstream Obsidian note skill is disabled by default (it saves notes into a local vault the owner cannot see), applying to existing bots when their containers are recreated."
+    zh: "旁聊聊完一轮，主对话里会留一行结果（完成、失败或已结束），你接着说话时它也知道旁聊里最新的进展；它正忙着干活时你再发新消息，会并进手上这一轮一起处理，不再中途一句一条往外冒；收到它打不开的文件会照实说打不开，把文件存进共享文件夹时也不再把你存的东西说成进了相册。"
+    en: "A finished side chat now leaves a one-line result in the main conversation (done, failed or ended), and the bot knows the latest side-chat updates when you talk to it next; messages you send while it is busy are folded into the turn it is working on instead of trickling out one by one; files it cannot open are reported as unreadable, and saving a file into the shared folder is no longer described as adding it to the photo library."
   agent:
     protocol: matrix
   bot:
