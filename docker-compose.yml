@@ -41,6 +41,8 @@ services:
         target: /seed/wonton/plugin.yaml
       - source: wonton_hooks
         target: /seed/wonton/__init__.py
+      - source: wonton_side_chat
+        target: /seed/wonton/side_chat.py
       - source: wonton_texts
         target: /seed/wonton/texts.py
       - source: wonton_locale
@@ -135,6 +137,8 @@ configs:
     file: ./wonton/plugin.yaml
   wonton_hooks:
     file: ./wonton/__init__.py
+  wonton_side_chat:
+    file: ./wonton/side_chat.py
   wonton_texts:
     file: ./wonton/texts.py
   wonton_locale:

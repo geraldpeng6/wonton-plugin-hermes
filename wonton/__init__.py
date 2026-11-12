@@ -1,4 +1,4 @@
-"""Wonton 给 Hermes 的两个钩子。
+"""Wonton 给 Hermes 的钩子。
 
 模型网关没接上（注入的模型变量为空）、或网关里还没有默认模型时（主人还没在「模型设置」里添加模型服务商），
 直接回一句该怎么做，不调模型。提示按说话人自己的语言写（核心按人记着 App 的语言），只有一种，不把几种语言拼在一起。
@@ -15,6 +15,8 @@
 不让用户生成令牌，调不通就照实说、不改存本地。上游把 MCP 工具收进 tool_search 延迟目录，模型绕过桥直接调会被
 「工具不存在」拒掉，之后就自己找地方存、让用户去网页生成令牌——所以引导要每轮都在，不能只指望技能。
 工具错误和确认过程也要按结果回答：调用前的预告不是执行结果，返回速度和成功结果都不能证明没有经过确认卡片。
+
+旁聊（私聊里的 Matrix 话题，ADR-0093）的结果行、主会话注入和声明在 side_chat.py。
 """
 
 import logging
@@ -108,3 +110,6 @@ def send_files_context(**_):
 def register(ctx):
     ctx.register_hook("post_gateway_admission", missing_model_hint)
     ctx.register_hook("pre_llm_call", send_files_context)
+    from . import side_chat
+
+    side_chat.register(ctx)
