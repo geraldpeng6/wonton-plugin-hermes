@@ -32,6 +32,17 @@ no/deny 后才执行；300 秒没人回答按拒绝处理（上游 fail-closed�
 显式关闭 `sessions.auto_prune`：保持上游不自动清理会话的默认行为，也不在主人配对前发送低磁盘询问。
 初始配置只在空数据目录中写入，不覆盖已有配置；这项设置不恢复历史消息的密钥。
 
+wonton 插件每轮在用户消息后附一段引导（wonton/，init 服务放进 Bot 数据目录）：应用的事用那个应用经总线提供的
+工具（tool_search 目录的「wonton tools」组，先 `tool_describe` 拿参数、再 `tool_call` 调），这些工具的身份由
+云吞带好，不让用户去应用网页生成令牌或粘贴密钥；调不通就如实说哪一步没走通，不改存本地文件。上游把 MCP 工具
+收进 `tool_search` 延迟目录，模型绕过桥直接调会被「工具不存在」拒掉，然后自己找地方存、让用户生成令牌，所以
+引导每轮都在。
+
+上游自带的 Obsidian 笔记技能默认关掉（`skills.disabled: [obsidian]`）：它把笔记存进 Bot 数据目录里的 Obsidian
+库，没配 `OBSIDIAN_VAULT_PATH` 时落在容器内的 `~/Documents/Obsidian Vault`，主人从任何界面都看不到；让记到
+Memos 这类应用的内容就这样存丢。已有 Bot 重建容器时 init 补上这项，主人自己写过的名单不动；想用 Obsidian 库，
+改数据目录 config.yaml 的这份名单并配好 `OBSIDIAN_VAULT_PATH`。
+
 ## 图标来源与授权
 
 `icon.png` 是 Nous Research 官方标志，来源、版权、处理方式、MIT 全文和商标说明见 [NOTICE](NOTICE)。本插件是独立维护的云吞插件包，不代表上游官方出品、合作或背书。

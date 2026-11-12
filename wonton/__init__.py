@@ -11,6 +11,9 @@
 每轮带上发文件的办法：Hermes 把工具结果里的预览存成缓存文件，写上 MEDIA:<路径>，它的 Matrix 提示
 又教模型用 MEDIA: 发文件，没有这句话时模型很可能把预览发给主人。存文件的办法也在这里：outbox 的路径是 Hermes 的挂载决定的。
 同一轮还带一句引导语：主人想要新页面或应用时，先调 wonton__plugin_guide。
+应用的事（记笔记、存文件等）用应用经总线提供的工具（tool_search 目录的「wonton tools」组），身份云吞已带好，
+不让用户生成令牌，调不通就照实说、不改存本地。上游把 MCP 工具收进 tool_search 延迟目录，模型绕过桥直接调会被
+「工具不存在」拒掉，之后就自己找地方存、让用户去网页生成令牌——所以引导要每轮都在，不能只指望技能。
 工具错误和确认过程也要按结果回答：调用前的预告不是执行结果，返回速度和成功结果都不能证明没有经过确认卡片。
 """
 
@@ -38,6 +41,14 @@ TOOL_RESULTS = (
     "Hermes 将工具失败标为顶层非空 error：遇到它，说明哪一步没成、结果给出的原因（用人话）和用户能做什么；不能继续说已开始或已完成。"
     "结果不确定就说不确定。确认卡片由核心处理，返回快或返回成功都不能证明没经过确认；"
     "结果没明确说明本次是否经过主人确认时，说不知道，不能编造没发卡片、绕过确认或主人已经点了允许。"
+)
+
+WONTON_APPS = (
+    "主人要在家里装的应用里做事（记笔记、存文件、听歌这类）时，用那个应用经总线提供的工具：它们在 tool_search 目录的"
+    "「wonton tools」一组里（名字形如 mcp__wonton__<应用>__…），照 tool_search 的说明先 tool_describe 拿参数、"
+    "再 tool_call 调用，不能把目录里的名字直接当普通工具调。这些工具的身份由云吞带好：永远不要让用户去应用网页"
+    "生成令牌、API key 或密码发给你，也不要把这类凭据写进聊天。应用没装、没就绪或调用失败时照实说哪一步没走通，"
+    "不能把内容改存到本地文件、Obsidian 库或 memory 里。"
 )
 
 
@@ -91,7 +102,7 @@ def _gateway_provider_active() -> bool:
 
 def send_files_context(**_):
     """``pre_llm_call``：返回的文字追加在这一轮的用户消息后面，不进系统提示。"""
-    return {"context": f"{SEND_FILES}\n{WRITE_PLUGIN}\n{TOOL_RESULTS}"}
+    return {"context": f"{SEND_FILES}\n{WRITE_PLUGIN}\n{TOOL_RESULTS}\n{WONTON_APPS}"}
 
 
 def register(ctx):
