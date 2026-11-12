@@ -455,7 +455,7 @@ README 的图标一节只留一句来源和商标说明，指向 `NOTICE`，不�
 `tests/` 是钩子的行为测试：本地起一个假核心，模型的列表和按人回语言的 MCP 工具都是真的 HTTP 请求。装好依赖再跑：
 
 ```bash
-uv venv .venv-test && uv pip install --python .venv-test/bin/python httpx
+uv venv .venv-test && uv pip install --python .venv-test/bin/python httpx ruamel.yaml
 .venv-test/bin/python -m unittest discover -s tests
 ```
 
