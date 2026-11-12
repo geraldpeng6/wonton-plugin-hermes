@@ -98,6 +98,14 @@ mcp_servers:
     url: ${WONTON_MCP_URL}
     timeout: 1800
 
+# 关掉上游自带的 Obsidian 笔记技能：它的职责是把笔记存进 Obsidian 库，没配 OBSIDIAN_VAULT_PATH 时落到
+# 这个 Bot 数据目录里的 ~/Documents/Obsidian Vault——主人从任何界面都看不到这个目录，让记到 Wonton 应用
+# （如 Memos）的内容就这样悄悄存丢。云吞里记笔记用 Memos 的工具（见 wonton 插件每轮带的引导）。
+# 主人想用 Obsidian 库：改数据目录 config.yaml 的这份名单，并把 OBSIDIAN_VAULT_PATH 指到看得见的存储。
+# init 对缺这项的已有 Bot 补同一份（见 init_config.py），主人自己写过的名单不动。
+skills:
+  disabled: [obsidian]
+
 timeouts:
   tools:
     sequential_call: 1800

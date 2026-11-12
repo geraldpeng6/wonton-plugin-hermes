@@ -10,8 +10,10 @@
 # 3) platforms.matrix.allow_admin_from：见下面第 3 块——占位符在这里换成注入值。
 # 4) approvals.smart_policy：包里 config.yaml 定的守卫默认规则，已有 Bot 的配置缺这项或留空时补上，
 #    主人自己写过的不动。
-# 前三处注入值不写进包里的 config.yaml：已装好的 Bot 也要修到一致，只有 init 每次创建容器时能补（第 4 处
-# 的守卫默认值相反，就存在包里的 config.yaml，init 从那里取）。`hermes config set` 在这里用不了：它降权运行，
+# 5) skills.disabled：包里 config.yaml 关掉的上游技能（现关 Obsidian 笔记技能），已有 Bot 的配置缺这项时补上，
+#    主人自己写过的名单不动。
+# 前三处注入值不写进包里的 config.yaml：已装好的 Bot 也要修到一致，只有 init 每次创建容器时能补（第 4、5 处
+# 的默认值相反，就存在包里的 config.yaml，init 从那里取）。`hermes config set` 在这里用不了：它降权运行，
 # 而这时数据目录还属于 root。
 import os
 
@@ -59,7 +61,8 @@ if isinstance(matrix, dict):
 # 4) approvals.smart_policy：默认值只存包里的 config.yaml 这一处（两份文本会漂移），补写时从这里取。
 #    配置里已有非空的 smart_policy 视为主人自定，不动；留空和缺失都按没有自定处理。
 with open("/seed/config.yaml") as f:
-    seed_policy = ((YAML().load(f) or {}).get("approvals") or {}).get("smart_policy")
+    seed = YAML().load(f) or {}
+seed_policy = (seed.get("approvals") or {}).get("smart_policy")
 if isinstance(seed_policy, str) and seed_policy.strip():
     approvals = config.get("approvals")
     if not isinstance(approvals, dict):
@@ -69,6 +72,18 @@ if isinstance(seed_policy, str) and seed_policy.strip():
     if not (isinstance(current, str) and current.strip()):
         # 字面量块写入，主人后来在 App 里编辑这份配置时读得清。
         approvals["smart_policy"] = LiteralScalarString(seed_policy)
+        changed = True
+
+# 5) skills.disabled：包里关掉的上游技能（包里 config.yaml 的注释写明原因），已有 Bot 的配置缺这项时补上。
+#    和第 4 处一样只存包里一处；主人自己写过的名单不动。
+seed_disabled = (seed.get("skills") or {}).get("disabled")
+if isinstance(seed_disabled, list) and seed_disabled:
+    skills = config.get("skills")
+    if not isinstance(skills, dict):
+        skills = {}
+        config["skills"] = skills
+    if "disabled" not in skills:
+        skills["disabled"] = seed_disabled
         changed = True
 
 if changed:
