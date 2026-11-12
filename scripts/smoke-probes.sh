@@ -61,7 +61,7 @@ extra_check() {
 
 hermes_gateway() { running_container "wonton-$SMOKE_INSTANCE--$SMOKE_SLUG--gateway"; }
 
-# 原生控制台：看得到在跑的网关进程，Channels 列得出四个平台。
+# 原生控制台：看得到在跑的网关进程，Channels 列得出七个平台。
 hermes_check_dashboard() {
   local status channels
   hermes_token || { extra_item FAIL 原生控制台 "页面里没有注入的会话 token"; return 0; }
@@ -70,9 +70,9 @@ hermes_check_dashboard() {
     { extra_item FAIL 原生控制台 "dashboard 看不到在跑的网关：$(agent_tail "$status")"; return 0; }
   channels="$(hermes_dash GET '/api/messaging/platforms?profile=default')" ||
     { extra_item FAIL 原生控制台 "Channels 接口失败：$(agent_tail "$channels")"; return 0; }
-  if jq -e '[.platforms[].id] as $ids | ["telegram", "matrix", "feishu", "wecom"] | all(. as $id | $ids | index($id) != null)' \
+  if jq -e '[.platforms[].id] as $ids | ["telegram", "matrix", "feishu", "wecom", "dingtalk", "qqbot", "weixin"] | all(. as $id | $ids | index($id) != null)' \
       <<<"$channels" >/dev/null; then
-    extra_item PASS 原生控制台 "dashboard 看得到在跑的网关，Channels 列出 telegram、matrix、feishu、wecom"
+    extra_item PASS 原生控制台 "dashboard 看得到在跑的网关，Channels 列出 telegram、matrix、feishu、wecom、dingtalk、qqbot、weixin"
   else
     extra_item FAIL 原生控制台 "Channels 少了要的平台：$(agent_tail "$channels")"
   fi
