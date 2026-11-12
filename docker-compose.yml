@@ -34,11 +34,11 @@ services:
       WONTON_MATRIX_ALLOWED_USERS: ${WONTON_MATRIX_ALLOWED_USERS:?需要主人的 Matrix 用户 ID}
       # 国内 IM 渠道开关（插件设置，true/false）：init 据此在 config.yaml 里写或撤显式停用（见 init_config.py）。
       # 开关值单独注入是为了改开关时重建 init + gateway 容器，停用状态跟着走。
-      FEISHU_WONTON_ENABLED: ${WONTON_SETTING_FEISHU_ENABLED}
-      DINGTALK_WONTON_ENABLED: ${WONTON_SETTING_DINGTALK_ENABLED}
-      WECOM_WONTON_ENABLED: ${WONTON_SETTING_WECOM_ENABLED}
-      QQ_WONTON_ENABLED: ${WONTON_SETTING_QQ_ENABLED}
-      WEIXIN_WONTON_ENABLED: ${WONTON_SETTING_WEIXIN_ENABLED}
+      FEISHU_WONTON_ENABLED: ${WONTON_SETTING_FEISHU_ENABLED:-}
+      DINGTALK_WONTON_ENABLED: ${WONTON_SETTING_DINGTALK_ENABLED:-}
+      WECOM_WONTON_ENABLED: ${WONTON_SETTING_WECOM_ENABLED:-}
+      QQ_WONTON_ENABLED: ${WONTON_SETTING_QQ_ENABLED:-}
+      WEIXIN_WONTON_ENABLED: ${WONTON_SETTING_WEIXIN_ENABLED:-}
     volumes:
       - ${WONTON_BOT_DATA}:/opt/data
     configs:
@@ -83,19 +83,20 @@ services:
       # 变量名是 Hermes 认的（各平台 gateway_env 桥接，见上游文档）；飞书固定走 WebSocket 长连接，钉钉走 Stream，
       # 企业微信走智能机器人的 WebSocket，QQ 走官方 WebSocket，个人微信凭据只能扫码取得（见 README）。
       # 开关单独注入：改开关会重建容器，init 随之在 config.yaml 里写/撤显式停用，关着的渠道即使留着凭据也不启用。
-      FEISHU_APP_ID: ${WONTON_SETTING_FEISHU_APP_ID}
-      FEISHU_APP_SECRET: ${WONTON_SECRET_FEISHU_APP_SECRET}
-      FEISHU_WONTON_ENABLED: ${WONTON_SETTING_FEISHU_ENABLED}
-      DINGTALK_CLIENT_ID: ${WONTON_SETTING_DINGTALK_CLIENT_ID}
-      DINGTALK_CLIENT_SECRET: ${WONTON_SECRET_DINGTALK_CLIENT_SECRET}
-      DINGTALK_WONTON_ENABLED: ${WONTON_SETTING_DINGTALK_ENABLED}
-      WECOM_BOT_ID: ${WONTON_SETTING_WECOM_BOT_ID}
-      WECOM_SECRET: ${WONTON_SECRET_WECOM_SECRET}
-      WECOM_WONTON_ENABLED: ${WONTON_SETTING_WECOM_ENABLED}
-      QQ_APP_ID: ${WONTON_SETTING_QQ_APP_ID}
-      QQ_CLIENT_SECRET: ${WONTON_SECRET_QQ_CLIENT_SECRET}
-      QQ_WONTON_ENABLED: ${WONTON_SETTING_QQ_ENABLED}
-      WEIXIN_WONTON_ENABLED: ${WONTON_SETTING_WEIXIN_ENABLED}
+      # 引用带 :- 空默认：核心离线校验（check / 索引 check-index）不给设置变量注值，裸引用会报未定义。
+      FEISHU_APP_ID: ${WONTON_SETTING_FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${WONTON_SECRET_FEISHU_APP_SECRET:-}
+      FEISHU_WONTON_ENABLED: ${WONTON_SETTING_FEISHU_ENABLED:-}
+      DINGTALK_CLIENT_ID: ${WONTON_SETTING_DINGTALK_CLIENT_ID:-}
+      DINGTALK_CLIENT_SECRET: ${WONTON_SECRET_DINGTALK_CLIENT_SECRET:-}
+      DINGTALK_WONTON_ENABLED: ${WONTON_SETTING_DINGTALK_ENABLED:-}
+      WECOM_BOT_ID: ${WONTON_SETTING_WECOM_BOT_ID:-}
+      WECOM_SECRET: ${WONTON_SECRET_WECOM_SECRET:-}
+      WECOM_WONTON_ENABLED: ${WONTON_SETTING_WECOM_ENABLED:-}
+      QQ_APP_ID: ${WONTON_SETTING_QQ_APP_ID:-}
+      QQ_CLIENT_SECRET: ${WONTON_SECRET_QQ_CLIENT_SECRET:-}
+      QQ_WONTON_ENABLED: ${WONTON_SETTING_QQ_ENABLED:-}
+      WEIXIN_WONTON_ENABLED: ${WONTON_SETTING_WEIXIN_ENABLED:-}
       # matrix.bot：核心代这个 Bot 登录后签发的身份，只给令牌，不给密码。
       MATRIX_HOMESERVER: ${WONTON_MATRIX_HOMESERVER}
       MATRIX_USER_ID: ${WONTON_MATRIX_USER_ID}
@@ -177,7 +178,7 @@ configs:
 x-wonton:
   spec: "0.12"
   id: com.nousresearch.hermes
-  version: 0.7.0
+  version: 0.7.1
   kind: agent
   title: { zh: AI 管家（Hermes）, en: All-Purpose Bot (Hermes) }
   description:
@@ -207,8 +208,8 @@ x-wonton:
 
       CN office-IM channels (Feishu, DingTalk, WeCom, QQ bot, personal WeChat) are enabled one by one in the plugin's settings: create a bot app on the platform's console, fill in the app ID and secret, and turn the switch on. These chats live only in that IM, not in the Wonton app's chat page; personal WeChat supports direct messages only and needs a one-time scan login from a terminal on the server (steps in the plugin README). Telegram is still configured in Hermes' native Channels page and uses Wonton's outbound proxy.
   release_notes:
-    zh: "新增国内办公 IM 渠道：在插件设置里逐个启用飞书、钉钉、企业微信、QQ 机器人或个人微信，填上在各平台建应用拿到的 ID 和密钥，就能在对应 IM 里和管家私聊（群聊按各平台上游默认）；这些聊天只出现在那个 IM 里，不进云吞 App。个人微信走腾讯官方通道，先在服务器终端扫码登录再开开关，只支持私聊。没填凭据的渠道不启用、不报错。"
-    en: "New CN office-IM channels: enable Feishu, DingTalk, WeCom, the QQ bot or personal WeChat one by one in the plugin settings, fill in the app ID and secret from the platform's console, and chat with the butler in that IM (group chats follow each platform's upstream defaults); these chats appear only in that IM, not in the Wonton app. Personal WeChat uses Tencent's official channel: scan to log in from a server terminal, then flip the switch; direct messages only. Channels without credentials stay off without errors."
+    zh: "兼容性修复：插件设置的引用改成带空默认值的写法，官方索引的校验脚本不再报错；渠道功能没有变化。"
+    en: "Compatibility fix: plugin-settings references now carry empty fallbacks so the official index validation passes; channel behavior is unchanged."
   agent:
     protocol: matrix
   bot:
