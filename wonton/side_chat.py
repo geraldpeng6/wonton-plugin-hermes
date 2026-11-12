@@ -1,4 +1,4 @@
-"""旁聊（ADR-0093 §1–§3）：主对话里的话题收成卡片，一轮结束在主对话里留一行结果，主对话下一轮知道。
+"""旁聊：主对话里的 Matrix 话题收成卡片，一轮结束在主对话里留一行结果，主对话下一轮知道。
 
 Hermes 一个 Matrix 话题（m.thread）一个会话。这个模块做三件事：
 
@@ -16,7 +16,7 @@ Hermes 一个 Matrix 话题（m.thread）一个会话。这个模块做三件事
 摘录（``post_llm_call`` 的 assistant_response）仍在它里取，两个钩子每轮先 post 后 end。
 
 发消息和写状态事件经适配器的私有方法（``_send_room_message``、``_client``、``_joined_rooms``）：
-适配器没有公开的发送入口（ADR-0093 §3），升级 Hermes 时先复查这几处。
+适配器没有公开的发送入口（云吞的旁聊约定还没给它留接口），升级 Hermes 时先复查这几处。
 
 会话对应、标题、摘录都在内存里：Bot 重启就丢，重启前后的结果行不补发；App 对没有结果行的旁聊
 显示「没收到结果」，不会卡在错误状态。发结果行失败只记日志、不重试成死循环——不能打断主人的对话。
@@ -266,7 +266,7 @@ async def _send_result(room, thread, state):
 
 
 async def _title(room, thread):
-    """结果行和注入用的标题：先按 ADR-0093 §1 从根消息取，取不到用进话题的第一句的
+    """结果行和注入用的标题：先按旁聊约定从根消息取，取不到用进话题的第一句的
     底稿，再取不到用话题根 id 的前 20 个字符（总比发不出标题强）。"""
     cell = _S["threads"].setdefault((room, thread), {})
     if cell.get("root_title"):
@@ -356,7 +356,7 @@ async def _write_declaration(room):
         logger.warning("旁聊声明写不出去：拿不到 Bot 自己的 Matrix ID room=%s", room)
         return
     try:
-        # state_key 必须是 Bot 自己：App 只认 state_key 和发送者相同、发送者是房间成员的声明（ADR-0054）。
+        # state_key 必须是 Bot 自己：App 只认 state_key 和发送者相同、发送者是房间成员的声明。
         await client.send_state_event(room, DECLARATION, {"v": 1}, state_key=bot)
     except Exception as exc:
         logger.warning("写旁聊声明失败 room=%s：%r", room, exc)

@@ -1,5 +1,5 @@
 """旁聊行为测试：给定钩子调用序列（话题会话一轮结束 / 失败 / 重置 / 主会话下一轮），
-断言发出的结果行和状态事件、注入的上下文。事件 JSON 按 ADR-0093 §1 的样例做契约断言。
+断言发出的结果行和状态事件、注入的上下文。事件 JSON 按云吞旁聊约定的样例做契约断言。
 
 Matrix 客户端和会话库都是假的；语言固定为中文，避免真的去问核心。
 """
@@ -175,7 +175,7 @@ class Case(unittest.IsolatedAsyncioTestCase):
     def result_lines(self):
         return [c for c in self.sent() if "app.wonton.side_chat_result" in c]
 
-    async def test_done_result_line_matches_adr_sample(self):
+    async def test_done_result_line_matches_contract_sample(self):
         await self.dispatch("整理一下手机里的照片", thread=ROOT)
         side_chat.post_llm_call(session_id=THREAD_SID,
                                 assistant_response="我把照片按日期分好了。\n\n第二段不要出现。")
@@ -184,7 +184,7 @@ class Case(unittest.IsolatedAsyncioTestCase):
         (content,) = self.result_lines()
         self.assertEqual(content["msgtype"], "m.notice")
         self.assertEqual(content["m.relates_to"], {"m.in_reply_to": {"event_id": ROOT}})
-        # ADR-0093 §1 的契约字段：字段名、v、root、state。
+        # 旁聊约定的契约字段：字段名、v、root、state。
         self.assertEqual(content["app.wonton.side_chat_result"],
                          {"v": 1, "root": ROOT, "title": "整理一下手机里的照片", "state": "done"})
         self.assertEqual(content["body"], "旁聊「整理一下手机里的照片」：已完成")
