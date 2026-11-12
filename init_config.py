@@ -145,9 +145,15 @@ def apply(config, seed) -> bool:
     for name, env in _IM_CHANNELS.items():
         entry = platforms.get(name)
         if os.environ.get(env, "").strip().lower() == "true":
-            # 开关打开：只撤掉残留的显式停用；没有凭据时 Hermes 自己保持未启用，不写空条目。
-            if isinstance(entry, dict) and entry.pop("enabled", None) is not None:
-                changed = True
+            # 开关打开：撤掉显式停用（没有凭据时 Hermes 自己保持未启用）；撤完就空或本来就是空映射的整个删掉，
+            # 配置里不留空条目。
+            if isinstance(entry, dict):
+                had_pin = entry.pop("enabled", None) is not None
+                if not entry:
+                    del platforms[name]
+                    changed = True
+                elif had_pin:
+                    changed = True
         else:
             if not isinstance(entry, dict):
                 entry = {}

@@ -89,7 +89,9 @@ docker exec -it <gateway 容器名> hermes gateway setup
 微信群通常拉不进它，群聊事件也不送达。两边都配过凭据时，以 Hermes 原生 Channels 页/终端向导写进 `.env` 的为准
 （Hermes 的 `.env` 覆盖同名环境变量）。
 
-首次启用飞书或钉钉渠道时，Hermes 会现装对应的官方 SDK（访问 PyPI），装完自动连接；其他三个渠道的依赖已在镜像里。
+首次启用飞书或钉钉渠道时，Hermes 会现装对应的官方 SDK（访问 PyPI），装完要等网关进程下一次启动才用得上：
+在插件网页（Hermes 原生 Channels 页）点「Restart to apply」，或重建 Bot 容器；之后自动连接。其他三个渠道的依赖
+已在镜像里，不用这步。
 
 ## 准备
 
