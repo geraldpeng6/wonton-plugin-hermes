@@ -8,7 +8,10 @@
 每条消息先问一次网关有哪些模型（同一个 Docker 网络里，几毫秒）：主人加了 key，下一条消息就照常回答，不用重启。
 网关连不上、回答不对时不拦，交给 Hermes 照常处理和报错，这里不猜原因。
 
-每轮带上发文件的办法：Hermes 把工具结果里的预览存成缓存文件，写上 MEDIA:<路径>，它的 Matrix 提示
+每轮带上收发文件的办法。收文件：主人用 App 发的文件是正文里的 wonton://file/<编号>，Hermes 只看到文字；PDF 这类
+wonton__view_file 读不了时，模型会让主人「作为附件再发一次」，主人照做还是一样，所以要它照实说读不了。存文件：存进共享文件夹后
+模型会说成「存进了相册」，相册应用里却可能找不到，所以要它照结果说文件夹和路径。
+发文件：Hermes 把工具结果里的预览存成缓存文件，写上 MEDIA:<路径>，它的 Matrix 提示
 又教模型用 MEDIA: 发文件，没有这句话时模型很可能把预览发给主人。存文件的办法也在这里：outbox 的路径是 Hermes 的挂载决定的。
 同一轮还带一句引导语：主人想要新页面或应用时，先调 wonton__plugin_guide。
 应用的事（记笔记、存文件等）用应用经总线提供的工具（tool_search 目录的「wonton tools」组），身份云吞已带好，
@@ -33,7 +36,14 @@ SEND_FILES = (
     "发给主人的文件来自工具结果里的编号时（「文件 …，编号 …」）：调 wonton__share_file，把返回的 wonton://file/ 链接原样放进回复，"
     "不要改动它，也不要用 MEDIA: 发这个文件或它的预览：预览只是缩小的图。你自己生成的图片和语音照旧用 MEDIA:。"
     "主人要把文件放进音乐库这类共享文件夹时：把文件放进 /opt/data/outbox，用 wonton__list_shares 看有哪些文件夹，再调 wonton__save_file，"
-    "这是唯一的办法。"
+    "这是唯一的办法。存好以后按结果说存进了哪个共享文件夹、什么路径（如「存进了 photos 共享文件夹」）；共享文件夹不是应用，"
+    "不要说成「存进了相册」「放进了音乐库」，也不要替应用保证它会显示出来。"
+)
+
+RECEIVED_FILES = (
+    "主人消息里单独一行的 wonton://file/<编号> 是主人用 App 发给你的文件，不是只发了名字：要看内容就用这个编号调 wonton__view_file。"
+    "它返回 not_viewable 时，是云吞还读不了这种文件的内容：照实告诉主人收到了哪个文件、读不了这种文件的内容；"
+    "不要让主人再发一次、换成附件发或者放到服务器上的某个路径，主人已经用附件发过了，重发也一样。"
 )
 
 WRITE_PLUGIN = "主人想要一个新的页面、应用或小工具，或者要改你之前写的插件时：先调 wonton__plugin_guide，照它说的做。"
@@ -104,7 +114,7 @@ def _gateway_provider_active() -> bool:
 
 def send_files_context(**_):
     """``pre_llm_call``：返回的文字追加在这一轮的用户消息后面，不进系统提示。"""
-    return {"context": f"{SEND_FILES}\n{WRITE_PLUGIN}\n{TOOL_RESULTS}\n{WONTON_APPS}"}
+    return {"context": f"{SEND_FILES}\n{RECEIVED_FILES}\n{WRITE_PLUGIN}\n{TOOL_RESULTS}\n{WONTON_APPS}"}
 
 
 def register(ctx):
