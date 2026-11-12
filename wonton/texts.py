@@ -57,3 +57,19 @@ SIDE_CHAT_DIGEST_BRIEF = {
     "zh-Hant": "旁聊「{title}」{state}",
     "ja": "サイドチャット「{title}」{state}",
 }
+
+# App 一次发的附件组没到齐（等了 120 秒）就开的一轮：这一轮文字末尾的说明，
+# 和发给主人的 m.notice。之后才到的会单独处理，不再等。
+BATCH_PARTIAL = {
+    "en": "(This batch has {total} messages; only {received} arrived.)",
+    "zh-Hans": "（这一组 {total} 条只收到 {received} 条）",
+    "zh-Hant": "（這一組 {total} 條只收到 {received} 條）",
+    "ja": "（この {total} 件のうち {received} 件しか届いていません）",
+}
+
+BATCH_NOTICE = {
+    "en": "Only {received} of {total} messages from your batch arrived, so I went ahead with those; anything else will be handled on its own.",
+    "zh-Hans": "这一组 {total} 条消息只收到了 {received} 条，先按收到的处理了；之后再到的会单独处理。",
+    "zh-Hant": "這一組 {total} 條訊息只收到了 {received} 條，先按收到的處理了；之後再到的會單獨處理。",
+    "ja": "{total} 件のうち {received} 件しか届いていないため、届いた分だけ処理しました。後から届いたものは別々に扱います。",
+}

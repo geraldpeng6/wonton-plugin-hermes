@@ -120,6 +120,8 @@ def send_files_context(**_):
 def register(ctx):
     ctx.register_hook("post_gateway_admission", missing_model_hint)
     ctx.register_hook("pre_llm_call", send_files_context)
+    from . import message_batch
     from . import side_chat
 
     side_chat.register(ctx)
+    message_batch.register(ctx)
