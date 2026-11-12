@@ -162,7 +162,8 @@ def pre_gateway_dispatch(event=None, gateway=None, session_store=None, **_):
             cell = _S["threads"].setdefault((room, thread), {})
             if not cell.get("title"):
                 first_line = str(getattr(event, "text", "") or "").split("\n", 1)[0].strip()
-                if first_line:
+                if first_line and not first_line.startswith("/"):
+                    # 斜杠命令（/new 之类）不是开旁聊的那句话，不当标题。
                     cell["title"] = first_line[:20]
         if session_store is not None:
             try:
@@ -296,14 +297,14 @@ async def _root_title(room, root):
 
 
 async def _root_content(client, room, root):
-    """经网关已登录的客户端取话题根的内容 dict；加密房间先解密。mautrix 的事件类型是 str
-    枚举，直接跟字符串比，不必 import。"""
+    """经网关已登录的客户端取话题根的内容 dict；加密房间先解密。mautrix 的事件类型不是 str
+    枚举（EventType.ROOM_ENCRYPTED == "m.room.encrypted" 不成立，v0.21.1 实测），要按 str 比。"""
     event = await client.get_event(room, root)
-    if event is not None and event.type == "m.room.encrypted":
+    if event is not None and str(event.type) == "m.room.encrypted":
         crypto = getattr(client, "crypto", None)
         if crypto is None:
             raise RuntimeError("房间加密但客户端没有解密器")
-        event = await crypto.decrypt_event(event)
+        event = await crypto.decrypt_megolm_event(event)
     if event is None:
         raise RuntimeError("话题根解不开")
     content = event.content

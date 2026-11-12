@@ -114,6 +114,27 @@ async def zh_language(_user_id=None):
     return "zh-Hans"
 
 
+class EncryptedRoot:
+    """话题根：加密事件的假象，解密后交出真内容。"""
+
+    type = "m.room.encrypted"
+
+    def __init__(self, content):
+        self._content = content
+        self.content = {"algorithm": "m.megolm.v1.aes-sha2", "ciphertext": "…"}
+
+    async def decrypted(self):
+        return RootEvent(self._content)
+
+
+class FakeCrypto:
+    def __init__(self, client):
+        self._client = client
+
+    async def decrypt_megolm_event(self, event):
+        return await event.decrypted()
+
+
 class Case(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.client = FakeClient()
@@ -186,12 +207,31 @@ class Case(unittest.IsolatedAsyncioTestCase):
         field = self.result_lines()[0]["app.wonton.side_chat_result"]
         self.assertEqual(field["title"], "第一行的标题很长很长很长很长"[:20])
 
+    async def test_title_from_encrypted_root_after_decrypt(self):
+        self.client.crypto = FakeCrypto(self.client)
+        self.client.roots[ROOT] = EncryptedRoot({
+            "msgtype": "m.notice", "body": "加密根的第一行标题\n第二行"})
+        await self.dispatch("进话题的第一句", thread=ROOT)
+        side_chat.on_session_end(session_id=THREAD_SID, completed=True)
+        await self.drain()
+        field = self.result_lines()[0]["app.wonton.side_chat_result"]
+        self.assertEqual(field["title"], "加密根的第一行标题"[:20])
+
     async def test_title_falls_back_to_ingress_first_line(self):
         await self.dispatch("进话题的第一句第一行\n第二行", thread=ROOT)  # 根取不到
         side_chat.on_session_end(session_id=THREAD_SID, completed=True)
         await self.drain()
         field = self.result_lines()[0]["app.wonton.side_chat_result"]
         self.assertEqual(field["title"], "进话题的第一句第一行"[:20])
+
+    async def test_title_skips_slash_commands(self):
+        # 重启后第一条进话题的是斜杠命令（/new 之类）：不当标题，等真正的一句话。
+        await self.dispatch("/new", thread=ROOT)
+        await self.dispatch("这才是开旁聊的话", thread=ROOT)
+        side_chat.on_session_reset(session_id="new-session", old_session_id=THREAD_SID)
+        await self.drain()
+        field = self.result_lines()[0]["app.wonton.side_chat_result"]
+        self.assertEqual(field["title"], "这才是开旁聊的话"[:20])
 
     async def test_failed_and_interrupted_send_failed(self):
         await self.dispatch("问题", thread=ROOT)
