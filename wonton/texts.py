@@ -5,6 +5,13 @@
 
 旁聊的引号沿用 ACP 桥的话题文字（四种语言都用「」，见 wonton-acp-bridge 的 locales/*/topics.ftl）。
 """
+NO_GATEWAY = {
+    "en": "The model gateway isn't ready yet. Open Apps → Models to check it, then message me again.",
+    "zh-Hans": "模型网关还没准备好，请在「应用 → 模型设置」里检查后再给我发消息。",
+    "zh-Hant": "模型閘道還沒準備好，請在「應用程式 → 模型设置」裡檢查後再傳訊息給我。",
+    "ja": "モデルゲートウェイの準備ができていません。アプリ → Models で確認してから、もう一度送ってください。",
+}
+
 
 NO_MODELS = {
     "en": "No model is available yet: add a model provider and its API key in Apps → Models, then message me again.",

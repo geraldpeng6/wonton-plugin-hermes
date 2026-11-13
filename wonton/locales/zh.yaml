@@ -1,4 +1,6 @@
 gateway:
+  model:
+    usage_switch_provider: "要更换模型服务，请打开「应用 → 模型设置」。"
   errors:
     connection_unknown: "暂时连不上你选的模型服务，稍后再试；也可以到「应用 → 模型设置」检查连接。"
     unreachable: "你选的模型服务无法连接，请到「应用 → 模型设置」检查服务是否运行、地址是否正确。"

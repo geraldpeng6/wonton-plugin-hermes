@@ -1,4 +1,6 @@
 gateway:
+  model:
+    usage_switch_provider: "モデルサービスを変更するには、アプリ → Models を開いてください。"
   errors:
     connection_unknown: "選んだAIサービスに接続できません。後でもう一度試すか、「アプリ → Models」で接続を確認してください。"
     unreachable: "選んだAIサービスに接続できません。「アプリ → Models」でサービスが動いているか、アドレスが正しいか確認してください。"

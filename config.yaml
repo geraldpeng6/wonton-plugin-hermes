@@ -1,7 +1,7 @@
 # Wonton 给 Hermes 的初始配置：首次启动时由 init 服务写成数据目录里的 config.yaml，之后不覆盖
 # （Hermes 自己也会改写它，比如 /model）。
 #
-# 模型只走 magpie。地址、凭据和默认模型都来自核心注入的环境变量，Hermes 会展开 ${VAR}：
+# 默认经 magpie 使用模型。地址、凭据和默认模型来自核心注入的环境变量，Hermes 会展开 ${VAR}：
 #   WONTON_MODEL_BASE_URL  magpie 网关的 OpenAI 兼容地址
 #   WONTON_MODEL_API_KEY   magpie 发给本插件的网关凭据（Hermes 用 key_env 读取，不落盘）
 #   WONTON_MODEL_DEFAULT   默认模型，指向 magpie 的路由组；换 provider 或模型只在 magpie 里改
@@ -20,6 +20,28 @@ providers:
       - ${WONTON_MODEL_DEFAULT}
     # 路由组里各成员窗口的下限；Hermes 要求至少 64K。
     context_length: 128000
+
+# 辅助任务跟随主模型，避免上游自动发现其他服务商；主人切换主模型时不强行切回网关。
+auxiliary:
+  vision: &wonton_model {provider: main}
+  compression: {<<: *wonton_model}
+  skills_hub: {<<: *wonton_model}
+  approval: {<<: *wonton_model}
+  review: {<<: *wonton_model}
+  mcp: {<<: *wonton_model}
+  title_generation: {<<: *wonton_model}
+  memory_query_rewrite: {<<: *wonton_model}
+  tts_audio_tags: {<<: *wonton_model}
+  voice_chat: {<<: *wonton_model}
+  triage_specifier: {<<: *wonton_model}
+  kanban_decomposer: {<<: *wonton_model}
+  profile_describer: {<<: *wonton_model}
+  goal_judge: {<<: *wonton_model}
+  curator: {<<: *wonton_model}
+  monitor: {<<: *wonton_model}
+  background_review: {<<: *wonton_model}
+  moa_reference: {<<: *wonton_model}
+  moa_aggregator: {<<: *wonton_model}
 
 # Matrix 的行为设置（身份和令牌由核心经环境变量注入）。只收发消息：不加处理中的表情回应、
 # 房间里不自动开线程，重启前后也不往聊天里发状态消息。
