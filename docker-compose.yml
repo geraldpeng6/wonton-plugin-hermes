@@ -19,12 +19,14 @@ services:
       - /bin/sh
       - -c
       - >-
-        mkdir -p /opt/data/plugins/wonton /opt/data/skills/wonton-help &&
+        mkdir -p /opt/data/plugins/wonton/locales /opt/data/hooks/wonton-language /opt/data/skills/wonton-help &&
         cp /seed/wonton/plugin.yaml /seed/wonton/*.py /opt/data/plugins/wonton/ &&
+        cp /seed/wonton/locales/*.yaml /opt/data/plugins/wonton/locales/ &&
+        cp /seed/wonton-language/HOOK.yaml /seed/wonton-language/handler.py /opt/data/hooks/wonton-language/ &&
         cp /seed/skills/wonton-help/SKILL.md /opt/data/skills/wonton-help/ &&
         { test -f /opt/data/config.yaml || cp /seed/config.yaml /opt/data/config.yaml; } &&
         /opt/hermes/.venv/bin/python /seed/init_config.py &&
-        chown -R ${PUID}:${PGID} /opt/data/skills /opt/data/plugins
+        chown -R ${PUID}:${PGID} /opt/data/skills /opt/data/plugins /opt/data/hooks/wonton-language
     environment:
       # init 要按注入值修 config.yaml：网关的三个变量为空表示没接上，magpie 标成 disabled。
       WONTON_MODEL_BASE_URL: ${WONTON_MODEL_BASE_URL}
@@ -56,6 +58,18 @@ services:
         target: /seed/wonton/texts.py
       - source: wonton_locale
         target: /seed/wonton/locale.py
+      - source: wonton_language_hook
+        target: /seed/wonton-language/HOOK.yaml
+      - source: wonton_language_handler
+        target: /seed/wonton-language/handler.py
+      - source: wonton_errors_en
+        target: /seed/wonton/locales/en.yaml
+      - source: wonton_errors_zh
+        target: /seed/wonton/locales/zh.yaml
+      - source: wonton_errors_zh_hant
+        target: /seed/wonton/locales/zh-hant.yaml
+      - source: wonton_errors_ja
+        target: /seed/wonton/locales/ja.yaml
       - source: init_config
         target: /seed/init_config.py
       - source: wonton_help_skill
@@ -172,6 +186,18 @@ configs:
     file: ./wonton/texts.py
   wonton_locale:
     file: ./wonton/locale.py
+  wonton_language_hook:
+    file: ./hooks/wonton-language/HOOK.yaml
+  wonton_language_handler:
+    file: ./hooks/wonton-language/handler.py
+  wonton_errors_en:
+    file: ./wonton/locales/en.yaml
+  wonton_errors_zh:
+    file: ./wonton/locales/zh.yaml
+  wonton_errors_zh_hant:
+    file: ./wonton/locales/zh-hant.yaml
+  wonton_errors_ja:
+    file: ./wonton/locales/ja.yaml
   init_config:
     file: ./init_config.py
   wonton_help_skill:
@@ -182,7 +208,7 @@ configs:
 x-wonton:
   spec: "0.12"
   id: com.nousresearch.hermes
-  version: 0.7.2
+  version: 0.7.3
   kind: agent
   title: { zh: AI 管家（Hermes）, en: All-Purpose Bot (Hermes) }
   description:
@@ -212,8 +238,10 @@ x-wonton:
 
       CN office-IM channels (Feishu, DingTalk, WeCom, QQ bot, personal WeChat) are enabled one by one in the plugin's settings: create a bot app on the platform's console, fill in the app ID and secret, and turn the switch on. These chats live only in that IM, not in the Wonton app's chat page; personal WeChat supports direct messages only and needs a one-time scan login from a terminal on the server (steps in the plugin README). Telegram is still configured in Hermes' native Channels page and uses Wonton's outbound proxy.
   release_notes:
-    zh: "在 App 里一次发几张照片加一句话，AI 把它们收齐了再一起处理：照片都在这一轮里，回答不再一张一张地冒出来；一组里有没传到的，等两分钟按收到的先答，并告诉你少了几条。"
-    en: "Photos and a message sent together in the app now arrive as one turn: the photos are all part of that round instead of one-by-one replies; when part of a batch is missing, it waits two minutes, answers with what arrived and tells you how many were missing."
+    zh: "模型服务连不上、登录失败或额度用完时，用看得懂的话说明原因和下一步，并跟随你的界面语言。"
+    zh-Hant: "模型服務連不上、登入失敗或額度用完時，用看得懂的話說明原因和下一步，並跟隨你的介面語言。"
+    en: "Connection, sign-in and usage-limit errors explain what happened and what to do next in your app's language."
+    ja: "AIサービスの接続・認証・利用上限のエラーを、アプリの言語でわかりやすく説明し、次にできることを案内します。"
   agent:
     protocol: matrix
   bot:

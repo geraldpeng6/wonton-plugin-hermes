@@ -29,3 +29,15 @@ jobs:
       # 还没有某个新能力时，在仓库 Settings → Variables 里设）> 套件默认（空，走 scripts/lib.sh 的默认值）。
       core-image: ${{ inputs.core-image || vars.WONTON_CORE_IMAGE }}
       upgrade-from: ${{ inputs.upgrade-from }}
+
+  locale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 验证官方 Hermes 中的四语报错和语言隔离
+        run: |
+          docker run --rm --network none \
+            --entrypoint /opt/hermes/.venv/bin/python \
+            -v "$PWD:/plugin:ro" -w /plugin \
+            nousresearch/hermes-agent:v0.22.7@sha256:e6d81ae52ebf6a43efa529701405509f20054ba818f179ddd748bed4f8af584c \
+            -m unittest discover -s tests/hermes -v

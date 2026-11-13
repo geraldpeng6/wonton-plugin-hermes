@@ -24,6 +24,7 @@ wonton__view_file 读不了时，模型会让主人「作为附件再发一次�
 
 import logging
 import os
+from pathlib import Path
 
 import httpx
 
@@ -118,6 +119,7 @@ def send_files_context(**_):
 
 
 def register(ctx):
+    ctx.register_locale_dir(Path(__file__).with_name("locales"))
     ctx.register_hook("post_gateway_admission", missing_model_hint)
     ctx.register_hook("pre_llm_call", send_files_context)
     from . import message_batch
