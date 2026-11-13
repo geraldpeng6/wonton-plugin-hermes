@@ -29,7 +29,7 @@ from pathlib import Path
 import httpx
 
 from .locale import language
-from .texts import NO_DEFAULT, NO_MODELS
+from .texts import NO_DEFAULT, NO_GATEWAY, NO_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +75,10 @@ async def missing_model_hint(text="", source=None, **_):
     base = os.environ.get("WONTON_MODEL_BASE_URL", "").rstrip("/")
     key = os.environ.get("WONTON_MODEL_API_KEY", "")
     model = os.environ.get("WONTON_MODEL_DEFAULT", "")
-    if not (base and key and model):
-        # 模型网关没接上（变量为空，spec：“models”是“有网关就用”）：主人的模型还配在网关这个 provider 上时，
-        # 直接给指引，不把 Hermes 对空地址的原始报错发进聊天；主人已经换成自己的服务商就不拦。
-        if _gateway_provider_active():
-            return {"action": "handled", "reply": NO_MODELS[await language(sender)]}
+    if not _gateway_provider_active():
         return None
+    if not (base and key and model):
+        return {"action": "handled", "reply": NO_GATEWAY[await language(sender)]}
     try:
         # 网关在插件网络里，不走代理环境变量（Hermes 的 gateway.trust_env 也是关的）。
         async with httpx.AsyncClient(timeout=5, trust_env=False) as client:

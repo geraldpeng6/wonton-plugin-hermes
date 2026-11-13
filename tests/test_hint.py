@@ -165,7 +165,14 @@ class HintCase(unittest.IsolatedAsyncioTestCase):
         del os.environ["WONTON_MODEL_BASE_URL"]
         del os.environ["WONTON_MODEL_API_KEY"]
         del os.environ["WONTON_MODEL_DEFAULT"]
-        self.assertEqual((await self.hint())["reply"], texts.NO_MODELS["zh-Hans"])
+        self.assertEqual((await self.hint())["reply"], texts.NO_GATEWAY["zh-Hans"])
+
+    async def test_explicit_other_provider_is_not_blocked_by_gateway(self):
+        with mock.patch.object(config, "load_config_readonly", return_value={"model": {"provider": "other"}}):
+            self.assertIsNone(await self.hint())
+            del os.environ["WONTON_MODEL_BASE_URL"]
+            self.assertIsNone(await self.hint())
+        self.assertEqual(self.fake.calls, [])
 
     async def test_default_model_present_replies_nothing(self):
         self.fake.models = ["group/wonton-default"]

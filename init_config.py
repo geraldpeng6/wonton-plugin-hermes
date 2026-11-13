@@ -1,12 +1,8 @@
-# 每次创建容器时把数据目录里的 config.yaml 修到和注入值一致（Hermes 自己也会改写它，这里只动核心管的三处），
+# 每次创建容器时把数据目录里的 config.yaml 修到和注入值一致（Hermes 自己也会改写它），
 # 另把包里 config.yaml 定的默认值补给已有 Bot。
 #
 # 1) gateway.trust_env：Matrix 适配器 v0.22.5–v0.22.7 解析代理时不传目标主机，NO_PROXY 不生效；继承
 #    HTTPS_PROXY 会把内部的 matrix.wonton.internal 发给出口代理而被 403 拒绝，所以关闭网关的环境代理。
-# 2) providers.magpie：模型网关可选（spec：“models”是“有网关就用”）——三个模型变量都有值时保持启用（没有
-#    enabled 字段就是启用）；都是空字符串（没接上网关）时标成 disabled，模型设置里不再显示这个不可用的
-#    provider，模型要用户自己在设置里配；网关装好后核心重建容器，这里再把它启用回来。用户自己加的 provider
-#    不动。enabled 字段是 Hermes 认的（hermes_cli.config_providers.is_provider_enabled）。
 # 3) platforms.matrix.allow_admin_from：见下面第 3 块——占位符在这里换成注入值。
 # 4) approvals.smart_policy：包里 config.yaml 定的守卫默认规则，已有 Bot 的配置缺这项或留空时补上，
 #    主人自己写过的不动。
@@ -19,9 +15,8 @@
 #    只认旧包写的 true，主人自己改过的不动。
 # 8) 国内 IM 渠道开关（飞书、钉钉、企业微信、QQ、个人微信，插件设置里每渠道一个）：开关关着在 config.yaml 写显式
 #    停用（优先于凭据），开关打开撤掉，启用与否由 Hermes 按凭据判定（见 apply 里的第 8 块）。
-# 前三处注入值不写进包里的 config.yaml：已装好的 Bot 也要修到一致，只有 init 每次创建容器时能补。第 4-7 处
-# 的默认值就存在包里的 config.yaml，init 从那里取。`hermes config set` 在这里用不了：它降权运行，而这时
-# 数据目录还属于 root。
+# 注入值要在已有 Bot 重建时更新，所以在这里处理；其余默认值从包里的 config.yaml 取。
+# `hermes config set` 在这里用不了：它降权运行，而这时数据目录还属于 root。
 import os
 
 from ruamel.yaml import YAML
@@ -72,19 +67,6 @@ def apply(config, seed) -> bool:
         gateway["trust_env"] = False
         config["gateway"] = gateway
         changed = True
-
-    base = os.environ.get("WONTON_MODEL_BASE_URL", "").strip()
-    key = os.environ.get("WONTON_MODEL_API_KEY", "").strip()
-    default = os.environ.get("WONTON_MODEL_DEFAULT", "").strip()
-    providers = config.get("providers")
-    magpie = providers.get("magpie") if isinstance(providers, dict) else None
-    if isinstance(magpie, dict):
-        if base and key and default:
-            if magpie.pop("enabled", None) is not None:
-                changed = True
-        elif magpie.get("enabled") is not False:
-            magpie["enabled"] = False
-            changed = True
 
     # 3) platforms.matrix.allow_admin_from：Hermes 只展开模型配置里的 ${VAR}，平台 extra 不展开；把名单占位符换成
     #    注入名单的第一个 ID（第一个就是归属人），家人加进 Bot 听的名单也不会拿到斜杠命令管理员。已有 Bot 重建

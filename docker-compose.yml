@@ -1,7 +1,7 @@
 # Hermes：云吞的默认 Agent。核心镜像带着同一份，核心第一次启动时自动装上；这个仓库让主人卸掉以后还能从商店装回来。
 #
-# Hermes 用自带的 Matrix 平台以 bot 身份登录 Tuwunel，只收发消息；模型默认走模型网关（magpie），
-# 没接上网关时用主人在“模型设置”里自己配的服务商。
+# Hermes 用自带的 Matrix 平台以 bot 身份登录 Tuwunel；默认模型经模型网关（magpie）。
+# 网关未就绪时提示主人检查模型设置，不自动改用其他服务商。
 # 每个 Bot 一组 init + gateway + web 容器（x-wonton.bots）：Hermes 的 profile 不隔离文件系统，
 # 不同人的 Bot 不能共用一个容器。
 name: hermes
@@ -28,7 +28,7 @@ services:
         /opt/hermes/.venv/bin/python /seed/init_config.py &&
         chown -R ${PUID}:${PGID} /opt/data/skills /opt/data/plugins /opt/data/hooks/wonton-language
     environment:
-      # init 要按注入值修 config.yaml：网关的三个变量为空表示没接上，magpie 标成 disabled。
+      # 模型变量由核心注入；已有模型配置由主人管理。
       WONTON_MODEL_BASE_URL: ${WONTON_MODEL_BASE_URL}
       WONTON_MODEL_API_KEY: ${WONTON_MODEL_API_KEY}
       WONTON_MODEL_DEFAULT: ${WONTON_MODEL_DEFAULT}
@@ -208,7 +208,7 @@ configs:
 x-wonton:
   spec: "0.12"
   id: com.nousresearch.hermes
-  version: 0.7.3
+  version: 0.7.4
   kind: agent
   title: { zh: AI 管家（Hermes）, en: All-Purpose Bot (Hermes) }
   description:
@@ -225,7 +225,7 @@ x-wonton:
     zh: |
       Nous Research 家的通用 AI 助手：在 App 里和它私聊，它能上网查资料、用你装的应用提供的工具、读你允许它看的文件夹。
 
-      消息走加密的 Matrix 私聊。模型默认走模型网关，不用自己填 key；没接网关时在“模型设置”里加自己的模型服务商和 key 也能用，它会按你的语言提醒你怎么配。经云吞装卸插件这类操作要你在卡片上确认；Hermes 自带的终端、文件和浏览器工具在它自己的容器里直接运行，能读写这个 Bot 的数据（含密钥）、能联网，碰不到你的共享文件夹和别的插件的数据。
+      消息走加密的 Matrix 私聊。默认使用“模型设置”里配好的模型；模型网关还没准备好时会提示你检查，不会偷偷换成别的服务。经云吞装卸插件这类操作要你在卡片上确认；Hermes 自带的终端、文件和浏览器工具在它自己的容器里直接运行，能读写这个 Bot 的数据（含密钥）、能联网，碰不到你的共享文件夹和别的插件的数据。
 
       国内办公 IM 渠道（飞书、钉钉、企业微信、QQ 机器人、个人微信）在插件详情页的「设置」里逐个启用：去对应平台的
       开放平台建一个机器人应用，把应用 ID 和密钥填进来、打开开关。这些聊天只出现在那个 IM 里，不进云吞 App 的聊天页；
@@ -234,14 +234,14 @@ x-wonton:
     en: |
       An all-round AI assistant by Nous Research: chat with it privately in the app, and it can search the web, use the tools your apps provide and read the folders you allow.
 
-      Messages travel in an encrypted Matrix chat. The model goes through the model gateway by default, so there is no key to fill in; without a gateway, add your own provider and key in Model settings and it will guide you there in your language. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's own terminal, file and browser tools run directly in its container: they can read and write this Bot's data (including secrets) and rea…
+      Messages travel in an encrypted Matrix chat. By default it uses the model configured in Models; if the model gateway is not ready, it asks you to check rather than silently switching services. Actions through Wonton, such as installing plugins, wait for your confirmation card. Hermes's terminal, file and browser tools run directly in its container: they can read and write this Bot's data, including secrets, and access the network, but not your shared folders or other apps' data.
 
       CN office-IM channels (Feishu, DingTalk, WeCom, QQ bot, personal WeChat) are enabled one by one in the plugin's settings: create a bot app on the platform's console, fill in the app ID and secret, and turn the switch on. These chats live only in that IM, not in the Wonton app's chat page; personal WeChat supports direct messages only and needs a one-time scan login from a terminal on the server (steps in the plugin README). Telegram is still configured in Hermes' native Channels page and uses Wonton's outbound proxy.
   release_notes:
-    zh: "模型服务连不上、登录失败或额度用完时，用看得懂的话说明原因和下一步，并跟随你的界面语言。"
-    zh-Hant: "模型服務連不上、登入失敗或額度用完時，用看得懂的話說明原因和下一步，並跟隨你的介面語言。"
-    en: "Connection, sign-in and usage-limit errors explain what happened and what to do next in your app's language."
-    ja: "AIサービスの接続・認証・利用上限のエラーを、アプリの言語でわかりやすく説明し、次にできることを案内します。"
+    zh: "默认从模型设置使用模型；连接未准备好时会提醒你检查，不再偷偷换别的服务。"
+    zh-Hant: "預設從模型設定使用模型；連線未準備好時會提醒你檢查，不再偷偷換別的服務。"
+    en: "Uses Models by default and asks you to check when the connection isn't ready, instead of silently switching services."
+    ja: "既定ではモデル設定を使い、接続の準備ができていないときは別のサービスに切り替えず確認を促します。"
   agent:
     protocol: matrix
   bot:
