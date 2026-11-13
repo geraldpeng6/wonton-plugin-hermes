@@ -9,6 +9,7 @@
 #
 # 共享验收可能已卸掉预装的 Hermes；仍装着时才保留数据卸载，再由调用方安装工作区版本。
 before_install() {
+  command -v probes_dev >/dev/null 2>&1 || return 0
   local installed
   installed="$(probes_dev status)" || return 1
   if grep -q '^com\.nousresearch\.hermes[[:space:]]' <<<"$installed"; then
